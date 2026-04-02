@@ -2,10 +2,9 @@
 MarkScientist v0.1 - Self-evolving Research Agent with Built-in Scientific Taste
 
 Core modules:
-- models: Model abstraction layer
 - agents: Three specialized agent types
-- prompts: Prompt definitions
-- trajectory: Trajectory data system
+- prompts: Role-prompt definitions layered on top of ResearchHarness
+- trajectory: Workflow-level trajectory wrappers around ResearchHarness traces
 - workflow: Research workflows
 """
 

@@ -26,7 +26,6 @@ from rich.panel import Panel
 from rich.table import Table
 
 from markscientist.config import Config, get_config, set_config
-from markscientist.models.base import ModelConfig
 
 console = Console()
 _HISTORY_FILE = Path.home() / ".markscientist_history"
@@ -104,42 +103,29 @@ class MarkScientistCLI:
         self._auto_review = True  # Auto-review mode enabled by default
         self._last_output = ""  # Store last solver output for reference
 
-    def _get_model_config(self) -> ModelConfig:
-        """Get model configuration."""
-        return ModelConfig(
-            backend=self.config.model.backend,
-            model_name=self.config.model.model_name,
-            api_key=self.config.model.api_key,
-            api_base=self.config.model.api_base,
-            temperature=self.config.agent.temperature,
-            top_p=self.config.agent.top_p,
-            max_tokens=self.config.agent.max_output_tokens,
-        )
-
     def _get_agent(self, agent_type: str):
         """Get agent instance by type."""
         from markscientist.agents import SolverAgent, JudgeAgent, EvaluatorAgent
 
-        model_config = self._get_model_config()
         workspace = self.config.workspace_root or Path.cwd()
         trace_dir = self.config.trajectory.save_dir
         trace_path = trace_dir / f"{self._session_id}_{agent_type}.jsonl" if self.config.trajectory.auto_save else None
 
         if agent_type == "solver":
             return SolverAgent(
-                model_config=model_config,
+                config=self.config,
                 workspace_root=workspace,
                 trace_path=trace_path,
             )
         elif agent_type == "judge":
             return JudgeAgent(
-                model_config=model_config,
+                config=self.config,
                 workspace_root=workspace,
                 trace_path=trace_path,
             )
         elif agent_type == "evaluator":
             return EvaluatorAgent(
-                model_config=model_config,
+                config=self.config,
                 workspace_root=workspace,
                 trace_path=trace_path,
             )
@@ -382,7 +368,7 @@ class MarkScientistCLI:
             if cmd_args:
                 self.config.model.model_name = cmd_args
                 return f"[green]Model switched to:[/green] {cmd_args}"
-            return f"[bold]Current model:[/bold] {self.config.model.backend}:{self.config.model.model_name}"
+            return f"[bold]Current model:[/bold] {self.config.model.model_name}"
 
         elif cmd_name == "config":
             return self._show_config()
@@ -429,7 +415,7 @@ class MarkScientistCLI:
         return f"""
 [bold cyan]Current Configuration[/bold cyan]
 {'─' * 40}
-[bold]Model:[/bold] {self.config.model.backend}:{self.config.model.model_name}
+[bold]Model:[/bold] {self.config.model.model_name}
 [bold]Agent:[/bold] {self._current_agent}
 [bold]Auto-review:[/bold] {auto_status}
 [bold]Session:[/bold] {self._session_id}
@@ -456,7 +442,7 @@ def run_interactive(config: Config, initial_agent: str = "solver") -> None:
     # Welcome message
     console.print()
     console.print("[bold cyan]MarkScientist[/bold cyan]  "
-                  f"[dim]{config.model.backend}:{config.model.model_name}[/dim]")
+                  f"[dim]{config.model.model_name}[/dim]")
     console.print(f"[dim]Auto-review: ON | Type /help for commands | Ctrl+C twice to exit[/dim]")
 
     session = PromptSession(
@@ -652,12 +638,6 @@ Examples:
     )
 
     parser.add_argument(
-        "--backend",
-        choices=["openai", "anthropic"],
-        help="Model backend",
-    )
-
-    parser.add_argument(
         "--workspace",
         help="Workspace directory",
     )
@@ -686,8 +666,6 @@ Examples:
     config = Config.from_env()
     if args.model:
         config.model.model_name = args.model
-    if args.backend:
-        config.model.backend = args.backend
     if args.workspace:
         config.workspace_root = Path(args.workspace)
     if args.no_save:

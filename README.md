@@ -18,18 +18,83 @@
 
 ## ✨ Features
 
+- **🧱 Built on ResearchHarness** — ResearchHarness owns SDK calls, tool calling, and the ReAct loop; MarkScientist owns multi-agent roles and workflow orchestration
 - **🤖 Three-Agent System** — Solver, Judge, Evaluator working together
 - **🎯 Auto-Review** — Judge automatically scores Solver's output
 - **🐾 Reviewer Buddies** — Fun ASCII characters for different task types
 - **📊 8 Task Types** — Each with appropriate scoring dimensions
-- **💾 Trajectory Recording** — Collect data for future model training
+- **💾 Workflow-Level Traces** — Preserve per-agent ResearchHarness traces and a higher-level workflow summary
 
 ## 🚀 Quick Start
 
 ```bash
+git submodule update --init --recursive
 pip install -e .
 markscientist
 ```
+
+## 🧠 How It Works
+
+`MarkScientist` is not a second execution harness. It is a higher-layer framework built on top of `ResearchHarness`.
+
+```mermaid
+flowchart TD
+    U[User Task] --> MS[MarkScientist Workflow Layer]
+    MS --> S[Solver Agent]
+    MS --> J[Judge Agent]
+    MS --> E[Evaluator Agent]
+    S --> RH[ResearchHarness Execution Layer]
+    J --> RH
+    E --> RH
+    RH --> P[Base System Prompt]
+    RH --> R[ReAct Loop]
+    RH --> T[Native Tool Calling]
+    RH --> X[Per-Agent Flat Traces]
+    MS --> W[Workflow Scheduling]
+    MS --> A[Role-Specific Prompt Addenda]
+    MS --> Y[Workflow-Level Trace Summary]
+```
+
+The internal `MarkScientist` design is intentionally layered:
+
+```mermaid
+flowchart TD
+    subgraph MS[MarkScientist]
+        CLI[CLI / Entry Points] --> WF[Workflow]
+        WF --> AG[Role Agents]
+        AG --> RP[Role Prompts]
+        WF --> WR[Workflow Trajectory Wrapper]
+    end
+
+    subgraph RH[ResearchHarness]
+        AB[BaseAgent / MultiTurnReactAgent]
+        LOOP[ReAct Runtime]
+        TOOLS[Tool Registry + Execution]
+        TRACE[FlatTraceWriter]
+    end
+
+    AG --> AB
+    AB --> LOOP
+    LOOP --> TOOLS
+    LOOP --> TRACE
+    WR --> TRACE
+```
+
+## 🧭 Architecture Boundary
+
+- `ResearchHarness` is the execution layer:
+  - OpenAI-compatible SDK calls
+  - native tool calling
+  - ReAct loop
+  - tool registry and execution
+  - flat per-agent trace writing
+- `MarkScientist` is the orchestration layer:
+  - Solver / Judge / Evaluator agent roles
+  - workflow scheduling and improvement loops
+  - role-specific prompt addenda
+  - workflow-level trajectory summaries
+
+`MarkScientist` agents inherit the ResearchHarness agent base instead of reimplementing the lower-layer execution stack.
 
 ## 💬 Usage
 
@@ -152,28 +217,28 @@ markscientist "Analyze this data" --json
 ### Python API
 
 ```python
-from markscientist.agents import SolverAgent, JudgeAgent, EvaluatorAgent
-from markscientist.models.base import ModelConfig
+from pathlib import Path
 
-config = ModelConfig(backend="openai", model_name="gpt-4o")
+from markscientist.agents import EvaluatorAgent, JudgeAgent, SolverAgent
+from markscientist.config import Config
 
-# Solver: Execute tasks
-solver = SolverAgent(model_config=config)
+config = Config.from_env()
+config.workspace_root = Path("./workspace")
+
+solver = SolverAgent(config=config)
 result = solver.run("Implement binary search")
 print(result.output)
 
-# Judge: Review artifacts
-judge = JudgeAgent(model_config=config)
-review = judge.review(artifact=result.output, artifact_type="code")
+judge = JudgeAgent(config=config)
+review = judge.review(artifact=result.output, artifact_type="code_analysis")
 print(f"Score: {review.overall_score}/10")
 print(f"Issues: {review.weaknesses}")
 
-# Evaluator: Meta-evaluate Solver + Judge
-evaluator = EvaluatorAgent(model_config=config)
+evaluator = EvaluatorAgent(config=config)
 meta = evaluator.evaluate(
     original_task="Implement binary search",
     solver_output=result.output,
-    judge_review=review.summary,
+    judge_review=review.raw_output,
 )
 print(f"Success Probability: {meta.success_probability}")
 print(f"System Insights: {meta.system_insights}")
@@ -217,8 +282,9 @@ print(f"System Insights: {meta.system_insights}")
 ```bash
 # .env
 API_KEY=your-key
-MODEL_NAME=gpt-4o
-MODEL_BACKEND=openai
+API_BASE=https://your-openai-compatible-endpoint/v1
+MODEL_NAME=gpt-5.4
+RESEARCHHARNESS_PATH=./vendor/ResearchHarness
 ```
 
 ## 🗺️ Roadmap
@@ -226,7 +292,7 @@ MODEL_BACKEND=openai
 - [x] v0.1 — Three agents, multi-type Judge, Buddies
 - [ ] v0.2 — Enhanced data collection
 - [ ] v0.3 — Workflow optimization
-- [ ] v1.0 — Self-trained model integration
+- [ ] v1.0 — Stronger workflow policies, richer evaluation, better high-level testing
 
 ## 📄 License
 

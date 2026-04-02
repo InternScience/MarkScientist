@@ -1,19 +1,23 @@
-"""
-MarkScientist Prompts Module
-
-v0.1 uses carefully designed prompts to simulate three agent types' behaviors.
-"""
+"""Role-prompt definitions layered on top of ResearchHarness."""
 
 from markscientist.prompts.v01_prompts import (
-    SOLVER_SYSTEM_PROMPT,
-    JUDGE_SYSTEM_PROMPT,
-    EVALUATOR_SYSTEM_PROMPT,
-    get_agent_prompt,
+    EVALUATOR_ROLE_PROMPT,
+    IMPROVEMENT_REQUEST_TEMPLATE,
+    JUDGE_ROLE_PROMPT,
+    META_EVALUATION_TEMPLATE,
+    REVIEW_REQUEST_TEMPLATE,
+    ROLE_PROMPTS,
+    SOLVER_ROLE_PROMPT,
+    get_role_prompt,
 )
 
 __all__ = [
-    "SOLVER_SYSTEM_PROMPT",
-    "JUDGE_SYSTEM_PROMPT",
-    "EVALUATOR_SYSTEM_PROMPT",
-    "get_agent_prompt",
+    "SOLVER_ROLE_PROMPT",
+    "JUDGE_ROLE_PROMPT",
+    "EVALUATOR_ROLE_PROMPT",
+    "ROLE_PROMPTS",
+    "get_role_prompt",
+    "REVIEW_REQUEST_TEMPLATE",
+    "IMPROVEMENT_REQUEST_TEMPLATE",
+    "META_EVALUATION_TEMPLATE",
 ]

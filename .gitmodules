@@ -1,0 +1,3 @@
+[submodule "vendor/ResearchHarness"]
+	path = vendor/ResearchHarness
+	url = https://github.com/black-yt/ResearchHarness.git
