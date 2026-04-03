@@ -105,6 +105,7 @@ class ResearchWorkflow:
         on_event=None,
     ) -> ReviewResult:
         judge = self._new_judge(project_root, recorder.trace_dir_for("judge"), on_event=on_event)
+        feedback_path = project_root / "judge" / "feedback_history.jsonl"
         review = judge.review_project_report(
             original_prompt=prompt,
             instructions_text=instructions_text,
@@ -113,6 +114,7 @@ class ResearchWorkflow:
             judge_materials_text=judge_materials_text,
             report_text=report_text,
             report_scenario=JudgeScenario.RESEARCH_REPORT,
+            taste_feedback_path=feedback_path if feedback_path.exists() else None,
             workspace_root=project_root,
         )
         recorder.capture_agent_result("judge", review)

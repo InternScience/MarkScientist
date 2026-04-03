@@ -22,6 +22,7 @@ class ProjectPaths:
     report_path: Path
     judge_notes_path: Path
     judge_checklist_path: Path
+    judge_feedback_path: Path
 
 
 def resolve_project_paths(project_root: Path | str) -> ProjectPaths:
@@ -45,6 +46,7 @@ def resolve_project_paths(project_root: Path | str) -> ProjectPaths:
         report_path=report_dir / "report.md",
         judge_notes_path=judge_dir / "notes.md",
         judge_checklist_path=judge_dir / "checklist.json",
+        judge_feedback_path=judge_dir / "feedback_history.jsonl",
     )
 
 

@@ -448,8 +448,8 @@ def test_workflow_separates_public_workspace_from_judge_materials(tmp_path: Path
     assert workflow.judge.workspace_roots == [tmp_path]
     assert "Hidden note: do not leak exact target conclusions." in workflow.judge.prompts[0]
     assert "Hidden criterion" in workflow.judge.prompts[0]
-    assert "## Project Review Policy" in workflow.judge.prompts[0]
-    assert "## Report Review Policy" in workflow.judge.prompts[0]
+    assert "## Project Review Panel" in workflow.judge.prompts[0]
+    assert "## Report Review Panel" in workflow.judge.prompts[0]
     assert "scenario: project_definition" in workflow.judge.prompts[0]
 
 

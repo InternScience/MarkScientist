@@ -104,6 +104,7 @@ JUDGE_ROLE_PROMPT = _build_role_prompt(
         "Judge the project definition itself. A vague, toy, synthetic, or scientifically weak project should receive a low `project_score` and should usually trigger `rechallenge`.",
         "Judge the report separately. A good project with weak execution should receive `solver_revision`, not `rechallenge`.",
         "Use the provided judge policy blocks as the active review contract. They define the current scenario, perspective, and scoring skill.",
+        "Treat each reviewer block as a distinct panel member. Simulate their judgments separately before producing the final aggregate verdict.",
         "Treat the perspective as a way to simulate a specialized reviewer with a specific focus, not as a license to ignore the checklist or hallucinate standards.",
         "Treat the skill description as the scoring style you should emulate when producing scores and critique.",
         "If judge-only materials are provided, use them privately for evaluation. Do not reward a public brief or checklist for leaking hidden answers into Solver-visible files.",
@@ -115,10 +116,11 @@ JUDGE_ROLE_PROMPT = _build_role_prompt(
     ],
     output_contract=[
         "Return JSON only.",
-        "Include `overall_score`, `project_score`, `report_score`, `verdict`, `summary`, `next_action`, `checklist_scores`, `strengths`, `weaknesses`, `suggestions`, and `confidence`.",
+        "Include `overall_score`, `project_score`, `report_score`, `verdict`, `summary`, `next_action`, `checklist_scores`, `strengths`, `weaknesses`, `suggestions`, `confidence`, and `panel_reviews`.",
         "Set `next_action` to `solver_revision` when the project definition is valid but the deliverables need stronger execution.",
         "Set `next_action` to `rechallenge` when the project definition, checklist, available-input framing, or task scope itself is toy-like, too vague, not grounded in real materials, or otherwise flawed enough that the Solver should not keep iterating on it.",
         "Each checklist score item should include at least `title`, `mode`, `score`, and `reasoning`.",
+        "Each `panel_reviews` item should include at least `reviewer`, `perspective`, `skill`, `project_score`, `report_score`, `summary`, and `recommendation`.",
     ],
 )
 
@@ -295,6 +297,8 @@ JUDGE_REQUEST_TEMPLATE = """Review the following research report strictly.
 - If judge-only materials are present, use them to evaluate hidden-target alignment, but do not expect the public project files to disclose those hidden targets verbatim.
 - Use a 0-100 scale inspired by ResearchClawBench. Treat 50 as benchmark-quality. Higher scores require clearly stronger scientific substance.
 - For each checklist item, determine whether it is primarily objective/quantitative or subjective/mechanistic, and score it with that strictness in mind.
+- First simulate the full reviewer panel. Let each reviewer contribute a distinct summary and recommendation based on its perspective and skill.
+- After the panel pass, aggregate the panel into one final benchmark decision and one final set of top-level scores.
 
 Return JSON only.
 Choose `next_action` carefully:

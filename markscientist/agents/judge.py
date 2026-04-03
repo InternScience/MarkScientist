@@ -10,9 +10,11 @@ from markscientist.agents.base import BaseScientistAgent
 from markscientist.judging import (
     JudgePolicy,
     JudgeScenario,
-    default_project_policy,
-    default_report_policy,
+    default_project_panel,
+    default_report_panel,
     load_taste_profile,
+    policy_key_for,
+    render_policy_panel,
 )
 from markscientist.prompts import (
     JUDGE_REQUEST_TEMPLATE,
@@ -38,6 +40,7 @@ class ReviewResult:
     raw_output: str = ""
     termination_reason: str = ""
     trace_path: str = ""
+    panel_reviews: List[Dict[str, Any]] = field(default_factory=list)
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -55,6 +58,7 @@ class ReviewResult:
             "confidence": self.confidence,
             "termination_reason": self.termination_reason,
             "trace_path": self.trace_path,
+            "panel_reviews": self.panel_reviews,
             "metadata": self.metadata,
         }
 
@@ -81,11 +85,11 @@ def _build_review_prompt(
     checklist_text: str,
     judge_materials_text: str,
     report_text: str,
-    project_policy: Optional[JudgePolicy] = None,
-    report_policy: Optional[JudgePolicy] = None,
+    project_panel: Optional[List[JudgePolicy]] = None,
+    report_panel: Optional[List[JudgePolicy]] = None,
 ) -> str:
-    project_policy = project_policy or default_project_policy()
-    report_policy = report_policy or default_report_policy()
+    project_panel = list(project_panel or default_project_panel())
+    report_panel = list(report_panel or default_report_panel())
     return JUDGE_REQUEST_TEMPLATE.format(
         original_prompt=original_prompt,
         instructions_text=instructions_text,
@@ -93,8 +97,8 @@ def _build_review_prompt(
         checklist_text=checklist_text,
         judge_materials_text=judge_materials_text or "No judge-only materials were provided.",
         report_text=report_text,
-        project_policy_block=project_policy.render("Project Review Policy"),
-        report_policy_block=report_policy.render("Report Review Policy"),
+        project_policy_block=render_policy_panel("Project Review Panel", tuple(project_panel)),
+        report_policy_block=render_policy_panel("Report Review Panel", tuple(report_panel)),
     )
 
 
@@ -146,6 +150,9 @@ def _parse_review_output(raw_output: str) -> ReviewResult:
     review.suggestions = data.get("suggestions", [])
     review.checklist_scores = data.get("checklist_scores", [])
     review.confidence = _parse_confidence(data.get("confidence", 0))
+    panel_reviews = data.get("panel_reviews")
+    if isinstance(panel_reviews, list):
+        review.panel_reviews = [item for item in panel_reviews if isinstance(item, dict)]
     metadata = data.get("metadata")
     if isinstance(metadata, dict):
         review.metadata = metadata
@@ -155,19 +162,43 @@ def _parse_review_output(raw_output: str) -> ReviewResult:
 def _apply_taste_calibration(
     review: ReviewResult,
     *,
-    project_policy: JudgePolicy,
-    report_policy: JudgePolicy,
+    project_panel: List[JudgePolicy],
+    report_panel: List[JudgePolicy],
     feedback_path: Optional[Path] = None,
 ) -> None:
     if feedback_path is None:
         return
     profile = load_taste_profile(feedback_path=feedback_path)
-    project_score, project_meta = profile.apply(review.project_score, project_policy.perspective.value)
-    report_score, report_meta = profile.apply(review.report_score, report_policy.perspective.value)
+
+    def _average_adjusted_score(score: float, panel: List[JudgePolicy], channel: str) -> tuple[float, Dict[str, Any]]:
+        applied_scores: List[float] = []
+        reviewer_meta: List[Dict[str, Any]] = []
+        for policy in panel:
+            adjusted_score, metadata = profile.apply(score, policy_key_for(policy))
+            reviewer_meta.append(
+                {
+                    "policy_key": policy_key_for(policy),
+                    "perspective": policy.perspective.value,
+                    "skill": policy.skill.value,
+                    **metadata,
+                }
+            )
+            applied_scores.append(adjusted_score)
+        calibration_applied = any(item["calibration_applied"] for item in reviewer_meta)
+        aggregate_score = sum(applied_scores) / len(applied_scores) if applied_scores else score
+        return aggregate_score, {
+            "channel": channel,
+            "calibration_applied": calibration_applied,
+            "reviewers": reviewer_meta,
+            "adjusted_score": aggregate_score,
+        }
+
+    project_score, project_meta = _average_adjusted_score(review.project_score, project_panel, "project")
+    report_score, report_meta = _average_adjusted_score(review.report_score, report_panel, "report")
     overall_score = min(project_score, report_score) if (project_score or report_score) else review.overall_score
     overall_meta = {
         "calibration_applied": bool(project_meta["calibration_applied"] or report_meta["calibration_applied"]),
-        "policy_keys": [project_policy.perspective.value, report_policy.perspective.value],
+        "policy_keys": [policy_key_for(policy) for policy in (*project_panel, *report_panel)],
     }
     review.project_score = project_score
     review.report_score = report_score
@@ -199,8 +230,8 @@ class JudgeAgent(BaseScientistAgent):
         taste_feedback_path: Optional[Path] = None,
         workspace_root=None,
     ) -> ReviewResult:
-        project_policy = default_project_policy()
-        report_policy = default_report_policy(report_scenario)
+        project_panel = list(default_project_panel())
+        report_panel = list(default_report_panel(report_scenario))
         result = self.run(
             _build_review_prompt(
                 original_prompt=original_prompt,
@@ -209,8 +240,8 @@ class JudgeAgent(BaseScientistAgent):
                 checklist_text=checklist_text,
                 judge_materials_text=judge_materials_text,
                 report_text=report_text,
-                project_policy=project_policy,
-                report_policy=report_policy,
+                project_panel=project_panel,
+                report_panel=report_panel,
             ),
             workspace_root=workspace_root,
         )
@@ -219,14 +250,15 @@ class JudgeAgent(BaseScientistAgent):
         review.trace_path = result.trace_path
         review.metadata.update(
             {
-                "project_policy": project_policy.to_dict(),
-                "report_policy": report_policy.to_dict(),
+                "report_scenario": report_scenario.value,
+                "project_panel": [policy.to_dict() for policy in project_panel],
+                "report_panel": [policy.to_dict() for policy in report_panel],
             }
         )
         _apply_taste_calibration(
             review,
-            project_policy=project_policy,
-            report_policy=report_policy,
+            project_panel=project_panel,
+            report_panel=report_panel,
             feedback_path=taste_feedback_path,
         )
         return review

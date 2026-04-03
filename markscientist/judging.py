@@ -181,6 +181,13 @@ class JudgePolicy:
         return "\n".join(lines)
 
 
+def render_policy_panel(heading: str, policies: Tuple[JudgePolicy, ...]) -> str:
+    lines = [f"## {heading}"]
+    for index, policy in enumerate(policies, start=1):
+        lines.append(policy.render(f"Reviewer {index}"))
+    return "\n\n".join(lines)
+
+
 def build_judge_policy(
     scenario: JudgeScenario,
     perspective: Optional[JudgePerspective] = None,
@@ -205,14 +212,68 @@ def build_judge_policy(
     )
 
 
-def default_project_policy() -> JudgePolicy:
-    return build_judge_policy(JudgeScenario.PROJECT_DEFINITION)
+def default_project_panel() -> Tuple[JudgePolicy, ...]:
+    return (
+        build_judge_policy(
+            JudgeScenario.PROJECT_DEFINITION,
+            perspective=JudgePerspective.METHODS_EXPERT,
+            skill=JudgeSkill.PROMETHEUS,
+        ),
+        build_judge_policy(
+            JudgeScenario.PROJECT_DEFINITION,
+            perspective=JudgePerspective.LITERATURE_EXPERT,
+            skill=JudgeSkill.GEVAL,
+        ),
+        build_judge_policy(
+            JudgeScenario.PROJECT_DEFINITION,
+            perspective=JudgePerspective.AREA_CHAIR,
+            skill=JudgeSkill.JUDGELM,
+        ),
+    )
 
 
-def default_report_policy(scenario: JudgeScenario = JudgeScenario.RESEARCH_REPORT) -> JudgePolicy:
-    if scenario not in {JudgeScenario.RESEARCH_REPORT, JudgeScenario.CLAIM_VALIDATION}:
-        raise ValueError(f"Unsupported report scenario: {scenario.value}")
-    return build_judge_policy(scenario)
+def default_report_panel(scenario: JudgeScenario = JudgeScenario.RESEARCH_REPORT) -> Tuple[JudgePolicy, ...]:
+    if scenario == JudgeScenario.RESEARCH_REPORT:
+        return (
+            build_judge_policy(
+                JudgeScenario.RESEARCH_REPORT,
+                perspective=JudgePerspective.AREA_CHAIR,
+                skill=JudgeSkill.JUDGELM,
+            ),
+            build_judge_policy(
+                JudgeScenario.RESEARCH_REPORT,
+                perspective=JudgePerspective.SKEPTIC,
+                skill=JudgeSkill.GEVAL,
+            ),
+            build_judge_policy(
+                JudgeScenario.RESEARCH_REPORT,
+                perspective=JudgePerspective.REPRODUCIBILITY_ADVOCATE,
+                skill=JudgeSkill.PROMETHEUS,
+            ),
+        )
+    if scenario == JudgeScenario.CLAIM_VALIDATION:
+        return (
+            build_judge_policy(
+                JudgeScenario.CLAIM_VALIDATION,
+                perspective=JudgePerspective.SKEPTIC,
+                skill=JudgeSkill.JUDGELM,
+            ),
+            build_judge_policy(
+                JudgeScenario.CLAIM_VALIDATION,
+                perspective=JudgePerspective.AREA_CHAIR,
+                skill=JudgeSkill.PROMETHEUS,
+            ),
+            build_judge_policy(
+                JudgeScenario.CLAIM_VALIDATION,
+                perspective=JudgePerspective.REPRODUCIBILITY_ADVOCATE,
+                skill=JudgeSkill.GEVAL,
+            ),
+        )
+    raise ValueError(f"Unsupported report panel scenario: {scenario.value}")
+
+
+def policy_key_for(policy: JudgePolicy) -> str:
+    return f"{policy.scenario.value}:{policy.perspective.value}:{policy.skill.value}"
 
 
 @dataclass

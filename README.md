@@ -64,6 +64,10 @@ The point is not to replace ResearchHarness. The point is to build a **scientifi
   Judge scores the project and report against an explicit challenge brief and checklist rather than vague style preferences.
 - **Scenario-aware Judge policies**
   Judge uses explicit review policies that combine scenario, reviewer perspective, and scoring skill instead of one generic review prompt.
+- **Multi-reviewer Judge panels**
+  Judge simulates multiple specialized reviewers and aggregates them into one final benchmark decision.
+- **Visible taste learning**
+  Optional score calibration can be learned from a visible workspace feedback log instead of hidden machine-local state.
 
 ### At a Glance
 
@@ -100,7 +104,7 @@ flowchart TD
     P --> JP[Project Review Contract]
     P --> S[Solver]
     S --> R[report/report.md]
-    R --> J[Judge]
+    R --> J[Judge Panel]
     J --> F{Next Action}
     F -->|solver_revision| S
     F -->|rechallenge| C
@@ -156,6 +160,7 @@ workspace_root/
   judge/
     notes.md            # optional judge-only guidance
     checklist.json      # optional judge-only rubric / hidden criteria
+    feedback_history.jsonl  # optional visible taste-learning feedback log
 ```
 
 Role responsibilities:
@@ -203,13 +208,13 @@ Current scoring skills:
 | `pairwise` | before-after comparison |
 | `judgelm` | evidence-heavy judgment and claim scrutiny |
 
-The public workflow currently uses these policies internally:
+The public workflow currently uses reviewer panels internally:
 
-- project definition review defaults to `project_definition × methods_expert × prometheus`
-- report review defaults to `research_report × area_chair × judgelm`
-- claim validation remains available as an explicit report-review scenario when a caller chooses it programmatically
+- project definition panel defaults to `methods_expert × prometheus`, `literature_expert × geval`, and `area_chair × judgelm`
+- report panel defaults to `area_chair × judgelm`, `skeptic × geval`, and `reproducibility_advocate × prometheus`
+- claim validation remains available as an explicit report-review scenario when a caller chooses it programmatically, and it uses its own panel composition
 
-Taste calibration is disabled by default. If a caller explicitly provides a feedback-history file path, Judge can apply small score offsets derived from repeated user feedback.
+Taste calibration is visible and optional. If `judge/feedback_history.jsonl` exists inside the current project workspace, Judge can apply small score offsets derived from repeated user feedback. Calibrations are keyed by the full reviewer identity (`scenario + perspective + skill`), which keeps different judging modes from contaminating each other. This keeps taste learning inside the workspace instead of relying on hidden machine-local files.
 
 ## 🧭 Architecture Boundary
 

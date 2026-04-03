@@ -2,7 +2,16 @@ import json
 
 from markscientist.agents.base import AgentResult
 from markscientist.agents.judge import JudgeAgent, _build_review_prompt, _parse_review_output
-from markscientist.judging import JudgeScenario, default_report_policy, load_taste_profile
+from markscientist.judging import (
+    JudgePerspective,
+    JudgeScenario,
+    JudgeSkill,
+    build_judge_policy,
+    default_project_panel,
+    default_report_panel,
+    load_taste_profile,
+    policy_key_for,
+)
 
 
 def _stub_judge_agent(payload):
@@ -35,15 +44,31 @@ def test_build_review_prompt_includes_policy_blocks():
         report_text="# Report",
     )
 
-    assert "## Project Review Policy" in prompt
-    assert "## Report Review Policy" in prompt
+    assert "## Project Review Panel" in prompt
+    assert "## Report Review Panel" in prompt
+    assert "## Reviewer 1" in prompt
+    assert "## Reviewer 2" in prompt
     assert "scenario: project_definition" in prompt
     assert "perspective:" in prompt
     assert "skill:" in prompt
 
 
-def test_default_report_policy_uses_explicit_scenario():
-    policy = default_report_policy(JudgeScenario.CLAIM_VALIDATION)
+def test_default_panels_are_multi_reviewer_and_skill_aware():
+    project_panel = default_project_panel()
+    report_panel = default_report_panel()
+
+    assert len(project_panel) == 3
+    assert len(report_panel) == 3
+    assert len({policy.perspective for policy in report_panel}) == 3
+    assert len({policy.skill for policy in project_panel}) == 3
+
+
+def test_build_judge_policy_uses_explicit_scenario():
+    policy = build_judge_policy(
+        JudgeScenario.CLAIM_VALIDATION,
+        perspective=JudgePerspective.SKEPTIC,
+        skill=JudgeSkill.JUDGELM,
+    )
 
     assert policy.scenario == JudgeScenario.CLAIM_VALIDATION
     assert "evidence_support" in policy.dimensions
@@ -51,7 +76,16 @@ def test_default_report_policy_uses_explicit_scenario():
 
 def test_load_taste_profile_is_empty_without_explicit_path():
     profile = load_taste_profile()
-    adjusted, metadata = profile.apply(72.0, "skeptic")
+    adjusted, metadata = profile.apply(
+        72.0,
+        policy_key_for(
+            build_judge_policy(
+                JudgeScenario.RESEARCH_REPORT,
+                perspective=JudgePerspective.SKEPTIC,
+                skill=JudgeSkill.GEVAL,
+            )
+        ),
+    )
 
     assert adjusted == 72.0
     assert metadata["calibration_applied"] is False
@@ -59,12 +93,17 @@ def test_load_taste_profile_is_empty_without_explicit_path():
 
 def test_load_taste_profile_applies_feedback_offsets(tmp_path):
     feedback_path = tmp_path / "feedback_history.jsonl"
+    policy = build_judge_policy(
+        JudgeScenario.RESEARCH_REPORT,
+        perspective=JudgePerspective.SKEPTIC,
+        skill=JudgeSkill.GEVAL,
+    )
     feedback_path.write_text(
         "\n".join(
             [
-                json.dumps({"judge_perspective": "skeptic", "user_reaction": "too_high"}),
-                json.dumps({"judge_perspective": "skeptic", "user_reaction": "too_high"}),
-                json.dumps({"judge_perspective": "skeptic", "user_reaction": "too_high"}),
+                json.dumps({"policy_key": policy_key_for(policy), "user_reaction": "too_high"}),
+                json.dumps({"policy_key": policy_key_for(policy), "user_reaction": "too_high"}),
+                json.dumps({"policy_key": policy_key_for(policy), "user_reaction": "too_high"}),
             ]
         )
         + "\n",
@@ -72,7 +111,7 @@ def test_load_taste_profile_applies_feedback_offsets(tmp_path):
     )
 
     profile = load_taste_profile(feedback_path=feedback_path, min_feedback_threshold=1)
-    adjusted, metadata = profile.apply(72.0, "skeptic")
+    adjusted, metadata = profile.apply(72.0, policy_key_for(policy))
 
     assert adjusted < 72.0
     assert metadata["calibration_applied"] is True
@@ -88,6 +127,7 @@ def test_review_result_parses_named_confidence():
                 "report_score": 56,
                 "summary": "Needs stronger evidence.",
                 "confidence": "high",
+                "panel_reviews": [{"reviewer": "Reviewer 1", "perspective": "skeptic", "skill": "geval"}],
             },
             ensure_ascii=False,
         )
@@ -95,9 +135,10 @@ def test_review_result_parses_named_confidence():
 
     assert review.overall_score == 61.0
     assert review.confidence == 0.75
+    assert review.panel_reviews[0]["perspective"] == "skeptic"
 
 
-def test_judge_review_project_report_uses_explicit_report_policy():
+def test_judge_review_project_report_uses_explicit_report_panel():
     agent = _stub_judge_agent(
         {
             "overall_score": 58,
@@ -109,6 +150,17 @@ def test_judge_review_project_report_uses_explicit_report_policy():
             "weaknesses": ["Claims remain under-supported."],
             "suggestions": ["Tighten claims and add direct evidence."],
             "confidence": "medium",
+            "panel_reviews": [
+                {
+                    "reviewer": "Reviewer 1",
+                    "perspective": "skeptic",
+                    "skill": "judgelm",
+                    "project_score": 70,
+                    "report_score": 58,
+                    "summary": "Claims are still under-supported.",
+                    "recommendation": "tighten claims",
+                }
+            ],
         }
     )
 
@@ -124,5 +176,8 @@ def test_judge_review_project_report_uses_explicit_report_policy():
     )
 
     assert review.report_score == 58.0
-    assert review.metadata["report_policy"]["scenario"] == "claim_validation"
+    assert review.metadata["report_scenario"] == "claim_validation"
+    assert len(review.metadata["project_panel"]) == 3
+    assert len(review.metadata["report_panel"]) == 3
+    assert review.panel_reviews[0]["skill"] == "judgelm"
     assert "scenario: claim_validation" in agent._fake_run.last_prompt

@@ -121,6 +121,8 @@ class MarkScientistCLI:
         table.add_row("Report", f"{review.report_score:.1f}/100")
         table.add_row("Verdict", review.verdict or "Unspecified")
         table.add_row("Next", review.next_action)
+        if review.panel_reviews:
+            table.add_row("Panel", str(len(review.panel_reviews)))
         if review.summary:
             table.add_row("Summary", review.summary[:160])
         if review.suggestions:
@@ -191,6 +193,7 @@ class MarkScientistCLI:
         checklist_text = load_checklist_text(paths.checklist_path)
         judge_materials_text = load_judge_materials_text(paths)
         report_text = read_text_if_exists(paths.report_path, default="report/report.md is missing.")
+        taste_feedback_path = paths.judge_feedback_path if paths.judge_feedback_path.exists() else None
         if show_spinner:
             self._spinner.start("Judge reviewing report...")
         try:
@@ -203,6 +206,7 @@ class MarkScientistCLI:
                 judge_materials_text=judge_materials_text,
                 report_text=report_text,
                 report_scenario=JudgeScenario.RESEARCH_REPORT,
+                taste_feedback_path=taste_feedback_path,
                 workspace_root=project_root,
             )
             return review
