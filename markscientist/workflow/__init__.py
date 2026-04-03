@@ -1,12 +1,5 @@
-"""
-MarkScientist Workflow Module
+"""MarkScientist workflow orchestration."""
 
-Basic research workflow, orchestrating Solver-Judge-Evaluator collaboration.
-"""
+from markscientist.workflow.basic import ResearchWorkflow, WorkflowResult
 
-from markscientist.workflow.basic import BasicResearchWorkflow, WorkflowResult
-
-__all__ = [
-    "BasicResearchWorkflow",
-    "WorkflowResult",
-]
+__all__ = ["ResearchWorkflow", "WorkflowResult"]

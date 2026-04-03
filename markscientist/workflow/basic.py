@@ -4,22 +4,26 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from markscientist.agents.evaluator import EvaluatorAgent, MetaEvaluationResult
-from markscientist.agents.evaluator import _build_evaluation_prompt, _parse_evaluation_output
+from markscientist.agents.challenger import ChallengerAgent
 from markscientist.agents.judge import JudgeAgent, ReviewResult, _build_review_prompt, _parse_review_output
 from markscientist.agents.solver import SolverAgent
 from markscientist.config import Config, get_config
-from markscientist.prompts import IMPROVEMENT_REQUEST_TEMPLATE
+from markscientist.project import ensure_project_layout, load_checklist_text, read_text_if_exists
+from markscientist.prompts import (
+    CHALLENGE_REQUEST_TEMPLATE,
+    SOLVER_IMPROVEMENT_GUIDANCE_TEMPLATE,
+    SOLVER_REQUEST_TEMPLATE,
+)
 from markscientist.trajectory.recorder import WorkflowTrajectoryRecorder
 
 
 @dataclass
 class WorkflowResult:
     prompt: str
+    workspace_root: str
+    challenge_output: str
     solver_output: str
     judge_review: Optional[ReviewResult] = None
-    evaluator_assessment: Optional[MetaEvaluationResult] = None
-    improved_output: Optional[str] = None
     final_score: float = 0.0
     success: bool = False
     iterations: int = 1
@@ -28,10 +32,10 @@ class WorkflowResult:
     def to_dict(self) -> Dict[str, Any]:
         return {
             "prompt": self.prompt,
+            "workspace_root": self.workspace_root,
+            "challenge_output": self.challenge_output[:500] + "..." if len(self.challenge_output) > 500 else self.challenge_output,
             "solver_output": self.solver_output[:500] + "..." if len(self.solver_output) > 500 else self.solver_output,
             "judge_review": self.judge_review.to_dict() if self.judge_review else None,
-            "evaluator_assessment": self.evaluator_assessment.to_dict() if self.evaluator_assessment else None,
-            "improved_output": self.improved_output[:500] + "..." if self.improved_output and len(self.improved_output) > 500 else self.improved_output,
             "final_score": self.final_score,
             "success": self.success,
             "iterations": self.iterations,
@@ -39,20 +43,26 @@ class WorkflowResult:
         }
 
 
-class BasicResearchWorkflow:
+class ResearchWorkflow:
     def __init__(
         self,
         config: Optional[Config] = None,
         improvement_threshold: float = 6.0,
-        max_improvement_iterations: int = 2,
-        enable_evaluator: bool = True,
+        max_iterations: int = 2,
         save_dir: Optional[Path] = None,
     ):
         self.config = config or get_config()
         self.improvement_threshold = improvement_threshold
-        self.max_improvement_iterations = max_improvement_iterations
-        self.enable_evaluator = enable_evaluator
+        self.max_iterations = max_iterations
         self.save_dir = save_dir or self.config.trajectory.save_dir
+
+    def _new_challenger(self, workspace_root: Path, trace_dir: Optional[Path], on_event=None) -> ChallengerAgent:
+        return ChallengerAgent(
+            config=self.config,
+            workspace_root=workspace_root,
+            trace_dir=trace_dir,
+            on_event=on_event,
+        )
 
     def _new_solver(self, workspace_root: Path, trace_dir: Optional[Path], on_event=None) -> SolverAgent:
         return SolverAgent(
@@ -70,13 +80,32 @@ class BasicResearchWorkflow:
             on_event=on_event,
         )
 
-    def _new_evaluator(self, workspace_root: Path, trace_dir: Optional[Path], on_event=None) -> EvaluatorAgent:
-        return EvaluatorAgent(
-            config=self.config,
+    def _judge_report(
+        self,
+        *,
+        prompt: str,
+        report_text: str,
+        challenge_brief: str,
+        checklist_text: str,
+        workspace_root: Path,
+        recorder: WorkflowTrajectoryRecorder,
+        on_event=None,
+    ) -> ReviewResult:
+        judge = self._new_judge(workspace_root, recorder.trace_dir_for("judge"), on_event=on_event)
+        judge_result = judge.run(
+            _build_review_prompt(
+                original_prompt=prompt,
+                challenge_brief=challenge_brief,
+                checklist_text=checklist_text,
+                report_text=report_text,
+            ),
             workspace_root=workspace_root,
-            trace_dir=trace_dir,
-            on_event=on_event,
         )
+        review = _parse_review_output(judge_result.output)
+        review.termination_reason = judge_result.termination_reason
+        review.trace_path = judge_result.trace_path
+        recorder.capture_agent_result("judge", review)
+        return review
 
     def run(
         self,
@@ -84,93 +113,100 @@ class BasicResearchWorkflow:
         workspace_root: Optional[Path] = None,
         on_event=None,
     ) -> WorkflowResult:
-        workspace_root = workspace_root or self.config.workspace_root or Path.cwd()
+        workspace_root = (workspace_root or self.config.workspace_root or Path.cwd()).expanduser().resolve()
+        paths = ensure_project_layout(workspace_root)
         recorder = WorkflowTrajectoryRecorder(
             prompt=prompt,
             model_name=self.config.model.model_name,
-            workspace_root=str(workspace_root),
+            workspace_root=str(paths.workspace_root),
             save_dir=self.save_dir if self.config.trajectory.auto_save else None,
         )
+        recorder.record.challenge_brief_path = str(paths.challenge_brief_path)
+        recorder.record.checklist_path = str(paths.checklist_path)
+        recorder.record.report_path = str(paths.report_path)
 
-        solver = self._new_solver(workspace_root, recorder.trace_dir_for("solver"), on_event=on_event)
-        solver_result = solver.run(prompt)
+        challenger = self._new_challenger(paths.workspace_root, recorder.trace_dir_for("challenger"), on_event=on_event)
+        challenge_result = challenger.run(
+            CHALLENGE_REQUEST_TEMPLATE.format(original_prompt=prompt),
+            workspace_root=paths.workspace_root,
+        )
+        recorder.capture_agent_result("challenger", challenge_result)
+
+        solver = self._new_solver(paths.workspace_root, recorder.trace_dir_for("solver"), on_event=on_event)
+        solver_result = solver.run(
+            SOLVER_REQUEST_TEMPLATE.format(
+                original_prompt=prompt,
+                additional_guidance="Read the prepared project files and complete the project end-to-end.",
+            ),
+            workspace_root=paths.workspace_root,
+        )
         recorder.capture_agent_result("solver", solver_result)
 
-        solver_output = solver_result.output
         iterations = 1
-        accepted_improved_output: Optional[str] = None
+        challenge_brief = read_text_if_exists(paths.challenge_brief_path, default="challenge/brief.md is missing.")
+        checklist_text = load_checklist_text(paths.checklist_path)
+        report_text = read_text_if_exists(paths.report_path, default=solver_result.output)
+        judge_review = self._judge_report(
+            prompt=prompt,
+            report_text=report_text,
+            challenge_brief=challenge_brief,
+            checklist_text=checklist_text,
+            workspace_root=paths.workspace_root,
+            recorder=recorder,
+            on_event=on_event,
+        )
 
-        judge = self._new_judge(workspace_root, recorder.trace_dir_for("judge"), on_event=on_event)
-        judge_result = judge.run(_build_review_prompt(solver_output, artifact_type="auto"))
-        judge_review = _parse_review_output(judge_result.output)
-        judge_review.termination_reason = judge_result.termination_reason
-        judge_review.metadata = dict(judge_result.metadata)
-        recorder.capture_agent_result("judge", judge_review)
-
-        improved_output: Optional[str] = None
-
-        while (
-            judge_review.overall_score < self.improvement_threshold
-            and iterations < self.max_improvement_iterations
-        ):
-            improvement_prompt = IMPROVEMENT_REQUEST_TEMPLATE.format(
-                original_output=solver_output,
-                review_feedback=judge_review.raw_output,
-            )
-            improvement_solver = self._new_solver(workspace_root, recorder.trace_dir_for("solver"), on_event=on_event)
-            improvement_result = improvement_solver.run(improvement_prompt)
-            recorder.capture_agent_result("solver", improvement_result)
-            improved_output = improvement_result.output
+        while judge_review.overall_score < self.improvement_threshold and iterations < self.max_iterations:
             iterations += 1
-
-            improvement_judge = self._new_judge(workspace_root, recorder.trace_dir_for("judge"), on_event=on_event)
-            improvement_judge_result = improvement_judge.run(_build_review_prompt(improved_output, artifact_type="auto"))
-            judge_review = _parse_review_output(improvement_judge_result.output)
-            judge_review.termination_reason = improvement_judge_result.termination_reason
-            judge_review.metadata = dict(improvement_judge_result.metadata)
-            recorder.capture_agent_result("judge", judge_review)
-
-            if judge_review.overall_score >= self.improvement_threshold:
-                solver_output = improved_output
-                accepted_improved_output = improved_output
-
-        evaluator_assessment = None
-        final_output = solver_output
-        if self.enable_evaluator:
-            evaluator = self._new_evaluator(workspace_root, recorder.trace_dir_for("evaluator"), on_event=on_event)
-            evaluator_result = evaluator.run(
-                _build_evaluation_prompt(
+            solver = self._new_solver(paths.workspace_root, recorder.trace_dir_for("solver"), on_event=on_event)
+            solver_result = solver.run(
+                SOLVER_REQUEST_TEMPLATE.format(
                     original_prompt=prompt,
-                    solver_output=solver_output,
-                    judge_review=judge_review.raw_output,
-                    final_result=final_output,
-                )
+                    additional_guidance=SOLVER_IMPROVEMENT_GUIDANCE_TEMPLATE.format(
+                        judge_feedback=judge_review.raw_output,
+                    ),
+                ),
+                workspace_root=paths.workspace_root,
             )
-            evaluator_assessment = _parse_evaluation_output(evaluator_result.output)
-            evaluator_assessment.termination_reason = evaluator_result.termination_reason
-            evaluator_assessment.metadata = dict(evaluator_result.metadata)
-            recorder.capture_agent_result("evaluator", evaluator_assessment)
+            recorder.capture_agent_result("solver", solver_result)
+            report_text = read_text_if_exists(paths.report_path, default=solver_result.output)
+            judge_review = self._judge_report(
+                prompt=prompt,
+                report_text=report_text,
+                challenge_brief=challenge_brief,
+                checklist_text=checklist_text,
+                workspace_root=paths.workspace_root,
+                recorder=recorder,
+                on_event=on_event,
+            )
 
-        quality_scores = {"overall_score": judge_review.overall_score, **judge_review.dimension_scores}
+        final_output = read_text_if_exists(paths.report_path, default=solver_result.output)
         recorder.complete(
             final_output=final_output,
             success=judge_review.overall_score >= self.improvement_threshold,
             iterations=iterations,
-            quality_scores=quality_scores,
-            metadata={"workspace_root": str(workspace_root)},
+            quality_scores={"overall_score": judge_review.overall_score},
+            metadata={
+                "workspace_root": str(paths.workspace_root),
+                "challenge_brief_path": str(paths.challenge_brief_path),
+                "checklist_path": str(paths.checklist_path),
+                "report_path": str(paths.report_path),
+            },
         )
 
         return WorkflowResult(
             prompt=prompt,
-            solver_output=solver_output,
+            workspace_root=str(paths.workspace_root),
+            challenge_output=challenge_result.output,
+            solver_output=final_output,
             judge_review=judge_review,
-            evaluator_assessment=evaluator_assessment,
-            improved_output=accepted_improved_output,
             final_score=judge_review.overall_score,
             success=judge_review.overall_score >= self.improvement_threshold,
             iterations=iterations,
             metadata={
-                "workflow_id": recorder.get_record().workflow_id,
-                "workspace_root": str(workspace_root),
+                "workflow_id": recorder.record.workflow_id,
+                "challenge_brief_path": str(paths.challenge_brief_path),
+                "checklist_path": str(paths.checklist_path),
+                "report_path": str(paths.report_path),
             },
         )

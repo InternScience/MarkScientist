@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Optional
 
 
 def _load_dotenv(path: Path) -> None:
@@ -29,12 +29,6 @@ class ModelConfig:
     model_name: str = "gpt-5.4"
     api_key: Optional[str] = None
     api_base: Optional[str] = None
-
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "model_name": self.model_name,
-            "api_base": self.api_base,
-        }
 
 
 @dataclass
@@ -89,27 +83,6 @@ class Config:
             agent=default_agent,
             trajectory=default_trajectory,
         )
-
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "model": self.model.to_dict(),
-            "agent": {
-                "max_llm_calls": self.agent.max_llm_calls,
-                "max_runtime_seconds": self.agent.max_runtime_seconds,
-                "max_output_tokens": self.agent.max_output_tokens,
-                "max_input_tokens": self.agent.max_input_tokens,
-                "max_retries": self.agent.max_retries,
-                "temperature": self.agent.temperature,
-                "top_p": self.agent.top_p,
-                "presence_penalty": self.agent.presence_penalty,
-            },
-            "trajectory": {
-                "auto_save": self.trajectory.auto_save,
-                "save_dir": str(self.trajectory.save_dir),
-            },
-            "workspace_root": str(self.workspace_root) if self.workspace_root else None,
-            "harness_path": str(self.harness_path) if self.harness_path else None,
-        }
 
 
 _global_config: Optional[Config] = None

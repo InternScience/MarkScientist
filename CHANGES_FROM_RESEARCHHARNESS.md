@@ -13,10 +13,11 @@ This document describes the current relationship between the two repositories.
 
 ## MarkScientist Owns
 
-- Solver / Judge / Evaluator role definitions
+- Challenger / Solver / Judge role definitions
 - role-specific prompt addenda
+- research-project preparation
 - workflow orchestration
-- improvement loops
+- solver/judge improvement loops
 - workflow-level trace summaries
 - higher-level tests for multi-agent coordination
 
@@ -35,5 +36,8 @@ Instead:
 
 - `MarkScientist` no longer maintains its own model-backend abstraction layer
 - all agent execution flows go through ResearchHarness
-- Judge and Evaluator are tool-free agents built on the same lower-layer base class
+- Challenger, Solver, and Judge all subclass the same lower-layer ResearchHarness base agent
+- Challenger prepares `INSTRUCTIONS.md`, `challenge/brief.md`, and `challenge/checklist.json`
+- Solver is responsible for producing `report/report.md`
+- Judge reviews the report against the prepared checklist and returns JSON scoring feedback
 - workflow trace files now wrap per-agent ResearchHarness traces instead of redefining the full flat-trace format

@@ -1,5 +1,6 @@
 from __future__ import annotations
-from dataclasses import dataclass, field
+
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional, Sequence
 
@@ -16,15 +17,14 @@ class AgentResult:
     output: str
     success: bool
     termination_reason: str = "completed"
-    session: Dict[str, Any] = field(default_factory=dict)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    trace_path: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, str | bool]:
         return {
             "output": self.output,
             "success": self.success,
             "termination_reason": self.termination_reason,
-            "metadata": self.metadata,
+            "trace_path": self.trace_path,
         }
 
 
@@ -91,11 +91,5 @@ class BaseScientistAgent(MultiTurnReactAgent):
             output=str(session.get("result_text", "")),
             success=termination == "result",
             termination_reason=termination,
-            session=session,
-            metadata={
-                "agent_type": self.agent_type,
-                "harness_root": str(self.harness_root),
-                "workspace_root": str(workspace_root) if workspace_root else None,
-                "trace_path": str(self.trace_path) if self.trace_path else None,
-            },
+            trace_path=str(self.trace_path) if self.trace_path else "",
         )

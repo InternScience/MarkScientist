@@ -32,14 +32,12 @@ class WorkflowTrajectoryRecorder:
         return self.save_dir / self.record.workflow_id / agent_type
 
     def capture_agent_result(self, agent_type: str, result) -> None:
-        metadata = dict(getattr(result, "metadata", {}) or {})
-        trace_path = metadata.get("trace_path", "")
+        trace_path = str(getattr(result, "trace_path", "") or "")
         self.record.set_agent_trace(
             agent_type=agent_type,
-            trace_path=str(trace_path or ""),
+            trace_path=trace_path,
             termination=str(getattr(result, "termination_reason", "")),
             output=str(getattr(result, "output", "")),
-            metadata=metadata,
         )
 
     def complete(
@@ -64,7 +62,4 @@ class WorkflowTrajectoryRecorder:
             timestamp = datetime.now().astimezone().strftime("%Y%m%d_%H%M%S")
             path = workflow_dir / f"workflow_{timestamp}_{self.record.workflow_id[:12]}.json"
             path.write_text(json.dumps(self.record.to_dict(), ensure_ascii=False, indent=2), encoding="utf-8")
-        return self.record
-
-    def get_record(self) -> WorkflowTraceRecord:
         return self.record

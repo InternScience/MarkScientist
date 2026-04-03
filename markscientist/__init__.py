@@ -1,8 +1,8 @@
 """
-MarkScientist v0.1 - Self-evolving Research Agent with Built-in Scientific Taste
+MarkScientist
 
 Core modules:
-- agents: Three specialized agent types
+- agents: Challenger, Solver, and Judge agent types
 - prompts: Role-prompt definitions layered on top of ResearchHarness
 - trajectory: Workflow-level trajectory wrappers around ResearchHarness traces
 - workflow: Research workflows
@@ -16,12 +16,17 @@ __author__ = "MarkScientist Team"
 from markscientist.config import Config
 
 if TYPE_CHECKING:
-    from markscientist.agents.evaluator import EvaluatorAgent
+    from markscientist.agents.challenger import ChallengerAgent
     from markscientist.agents.judge import JudgeAgent
     from markscientist.agents.solver import SolverAgent
+    from markscientist.workflow import ResearchWorkflow
 
 
 def __getattr__(name: str):
+    if name == "ChallengerAgent":
+        from markscientist.agents.challenger import ChallengerAgent
+
+        return ChallengerAgent
     if name == "SolverAgent":
         from markscientist.agents.solver import SolverAgent
 
@@ -30,16 +35,17 @@ def __getattr__(name: str):
         from markscientist.agents.judge import JudgeAgent
 
         return JudgeAgent
-    if name == "EvaluatorAgent":
-        from markscientist.agents.evaluator import EvaluatorAgent
+    if name == "ResearchWorkflow":
+        from markscientist.workflow import ResearchWorkflow
 
-        return EvaluatorAgent
+        return ResearchWorkflow
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 __all__ = [
     "Config",
+    "ChallengerAgent",
     "SolverAgent",
     "JudgeAgent",
-    "EvaluatorAgent",
+    "ResearchWorkflow",
     "__version__",
 ]

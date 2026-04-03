@@ -34,10 +34,13 @@ class WorkflowTraceRecord:
     prompt: str = ""
     workspace_root: str = ""
     model_name: str = ""
+    challenger: Optional[AgentTraceRef] = None
     solver: Optional[AgentTraceRef] = None
     judge: Optional[AgentTraceRef] = None
-    evaluator: Optional[AgentTraceRef] = None
     history: list[AgentTraceRef] = field(default_factory=list)
+    challenge_brief_path: str = ""
+    checklist_path: str = ""
+    report_path: str = ""
     final_output_preview: str = ""
     quality_scores: Dict[str, float] = field(default_factory=dict)
     success: bool = False

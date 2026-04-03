@@ -4,28 +4,29 @@
 
 **Self-evolving Research Agent with Built-in Scientific Taste**
 
-**Solver executes → Judge reviews → Evaluator improves**
+**Challenger prepares → Solver researches → Judge reviews**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
 [![Built On](https://img.shields.io/badge/Built%20On-ResearchHarness-2563eb.svg)](https://github.com/black-yt/ResearchHarness)
-[![Workflow](https://img.shields.io/badge/Workflow-Solver%20Judge%20Evaluator-4f46e5.svg)](#-how-it-works)
+[![Workflow](https://img.shields.io/badge/Workflow-Challenger%20Solver%20Judge-4f46e5.svg)](#-how-it-works)
 [![Trace](https://img.shields.io/badge/Trace-Workflow%20Summary-0f766e.svg)](#-how-it-works)
-[![Scope](https://img.shields.io/badge/Scope-Orchestration%20Layer-orange.svg)](#-architecture-boundary)
+[![Scope](https://img.shields.io/badge/Scope-Scientific%20Workflow-orange.svg)](#-architecture-boundary)
 
 </div>
 
-MarkScientist is a higher-layer framework for running **role-specialized agents**, **review-driven improvement loops**, and **workflow-level evaluation** on top of ResearchHarness.
+MarkScientist is a higher-layer framework for turning a user request into a **research project workspace**, executing that project, and reviewing the resulting report on top of ResearchHarness.
 
 Unlike a standalone execution harness, this project is intentionally centered on:
 
-- Solver, Judge, and Evaluator role separation
-- iterative review and improvement loops
+- Challenger, Solver, and Judge role separation
+- project-first research workflows
+- review-driven improvement loops
 - workflow-level traces layered on top of per-agent harness traces
 - higher-level orchestration and evaluation policies
-- a CLI that exposes system behavior across multiple agents
+- a CLI that exposes the full research loop across multiple agents
 
-The point is not to replace ResearchHarness. The point is to build a **multi-agent scientific workflow layer** that reuses the lower-layer runtime while adding role structure, review pressure, and orchestration logic.
+The point is not to replace ResearchHarness. The point is to build a **scientific workflow layer** that reuses the lower-layer runtime while adding project setup, role structure, review pressure, and orchestration logic.
 
 ---
 
@@ -34,13 +35,12 @@ The point is not to replace ResearchHarness. The point is to build a **multi-age
 - [✨ Highlights](#-highlights)
 - [⚡ Quick Start](#-quick-start)
 - [🧠 How It Works](#-how-it-works)
+- [🗂 Project Model](#-project-model)
 - [🧭 Architecture Boundary](#-architecture-boundary)
 - [💬 Usage](#-usage)
-- [🐾 Reviewer Buddies](#-reviewer-buddies)
 - [📋 Commands](#-commands)
-- [🎯 Task Types](#-task-types)
 - [⚙️ Config](#️-config)
-- [🗺️ Roadmap](#️-roadmap)
+- [🧪 Testing](#-testing)
 - [🪪 License](#-license)
 
 ---
@@ -49,27 +49,28 @@ The point is not to replace ResearchHarness. The point is to build a **multi-age
 
 - **Built on ResearchHarness**
   ResearchHarness owns SDK calls, tool calling, and the ReAct loop; MarkScientist owns multi-agent roles and workflow orchestration.
-- **Three-agent workflow**
-  Solver executes, Judge reviews, and Evaluator inspects system-level behavior.
+- **Three-role research loop**
+  Challenger prepares the project, Solver performs the research, and Judge scores the resulting report.
+- **Project-first execution**
+  The workflow is built around a concrete workspace with instructions, checklist, code, outputs, and `report/report.md`.
 - **Review-driven improvement**
   The workflow can iteratively improve outputs based on Judge feedback instead of stopping at one draft.
 - **Workflow-level traces**
   MarkScientist preserves per-agent ResearchHarness traces and adds a higher-level workflow summary.
-- **Task-aware review**
-  Judge supports multiple task types with task-appropriate scoring dimensions.
-- **Reviewer buddies**
-  The CLI includes lightweight reviewer personas for more readable interactive evaluation.
+- **Checklist-based judging**
+  Judge scores the report against an explicit challenge brief and checklist rather than vague style preferences.
 
 ### At a Glance
 
 | Area | What MarkScientist focuses on |
 | --- | --- |
 | Runtime dependency | Reuses ResearchHarness for execution |
-| Roles | Solver, Judge, Evaluator |
-| Review model | Score, critique, and improve |
+| Roles | Challenger, Solver, Judge |
+| Core artifact | A prepared research project workspace |
+| Review model | Score, critique, and improve the report |
 | Trace model | Workflow summary plus per-agent traces |
 | UX | Interactive multi-agent CLI |
-| Scope | Orchestration layer, not execution harness |
+| Scope | Scientific workflow layer, not execution harness |
 
 ## 🚀 Quick Start
 
@@ -87,16 +88,16 @@ markscientist
 
 ```mermaid
 flowchart TD
-    U[User Task] --> CLI[CLI / Entry Points]
-    CLI --> WF[Workflow Scheduler]
-    WF --> S[Solver]
-    WF --> J[Judge]
-    WF --> E[Evaluator]
-    S --> IL[Improvement Loop]
-    J --> IL
-    IL --> WF
-    WF --> RP[Role Prompt Addenda]
-    WF --> WR[Workflow-Level Trace Summary]
+    U[User Prompt] --> WF[Workflow Scheduler]
+    WF --> C[Challenger]
+    C --> P[Prepared Project Workspace]
+    P --> S[Solver]
+    S --> R[report/report.md]
+    R --> J[Judge]
+    J --> F[Scored Feedback]
+    F -->|below threshold| S
+    F -->|acceptable| DONE[Workflow Complete]
+    WF --> T[Workflow Trace Summary]
 ```
 
 The lower-layer execution details live in `ResearchHarness`, and `MarkScientist` connects to them like this:
@@ -104,7 +105,7 @@ The lower-layer execution details live in `ResearchHarness`, and `MarkScientist`
 ```mermaid
 flowchart TD
     subgraph MS[MarkScientist]
-        WF[Workflow / Scheduling] --> AG[Role Agents]
+        WF[Workflow / Scheduling] --> AG[Challenger / Solver / Judge]
         AG --> RP[Role Prompts]
         WF --> WR[Workflow Trajectory Wrapper]
     end
@@ -123,6 +124,33 @@ flowchart TD
     WR --> TRACE
 ```
 
+## 🗂 Project Model
+
+The workflow prepares and executes a project workspace inspired by benchmark-style research tasks.
+
+Expected layout:
+
+```text
+workspace_root/
+  INSTRUCTIONS.md
+  challenge/
+    brief.md
+    checklist.json
+  data/
+  related_work/
+  code/
+  outputs/
+  report/
+    report.md
+    images/
+```
+
+Role responsibilities:
+
+- `Challenger` prepares `INSTRUCTIONS.md`, `challenge/brief.md`, and `challenge/checklist.json`.
+- `Solver` reads the prepared project, performs the research, and must finish with `report/report.md`.
+- `Judge` reads the brief, checklist, and report, then returns strict JSON scoring feedback.
+
 ## 🧭 Architecture Boundary
 
 - `ResearchHarness` is the execution layer:
@@ -132,8 +160,9 @@ flowchart TD
   - tool registry and execution
   - flat per-agent trace writing
 - `MarkScientist` is the orchestration layer:
-  - Solver / Judge / Evaluator agent roles
-  - workflow scheduling and improvement loops
+  - Challenger / Solver / Judge roles
+  - project preparation and workflow scheduling
+  - solver/judge improvement loops
   - role-specific prompt addenda
   - workflow-level trajectory summaries
 
@@ -144,117 +173,56 @@ flowchart TD
 ### Interactive REPL
 
 ```bash
-markscientist          # Start REPL (Solver + auto Judge review)
+markscientist
 ```
 
-### 1. Solver Mode (Default, with Auto-Review)
+Default mode runs the full research workflow.
 
 ```
-[solver+judge] > What is the transformer architecture?
+[workflow] > Analyze the attached dataset and produce a research report.
 
-╭──────────────── Solver Output ────────────────╮
-│ The Transformer was proposed in "Attention   │
-│ Is All You Need" by Vaswani et al. in 2017...│
+╭──────────────── Final Report ────────────────╮
+│ # Research Report                            │
+│ ...                                          │
 ╰──────────────────────────────────────────────╯
 
-((•)(•)) =•ω•= [•=•] /• •\ Summoning reviewer...
-
-[•=•] EVAL-9000 appears! "Computing evaluation scores..."
-
-╭─────────── The Objective Analyzer ───────────╮
-│  Reaction   ✓ Excellent!                     │
-│  Type       factual_query                    │
-│  Score      8.5/10                           │
+╭──────────── Workflow Summary ────────────────╮
+│ Status      Success                          │
+│ Score       7.5/10                           │
+│ Iterations  2                                │
 ╰──────────────────────────────────────────────╯
 ```
 
-### 2. Judge Mode (Review Artifacts)
+Switch to a single role when needed:
 
 ```
-[solver+judge] > /judge
+[workflow] > /challenger
+[challenger] > Prepare a project for reproducing the core claim.
 
-[judge] > Review this code:
-def fib(n): return fib(n-1)+fib(n-2) if n>1 else n
+[challenger] > /solver
+[solver] > Execute the prepared project and write the report.
 
-╭──────────────── Judge Review ─────────────────╮
-│  Type       code_analysis                     │
-│  Score      5.5/10                            │
-│  Details    correctness: 7.0 | efficiency: 3.0│
-│  Issues     No memoization; O(2^n) complexity │
-╰───────────────────────────────────────────────╯
-```
-
-### 3. Evaluator Mode (Meta-Evaluation)
-
-Evaluates the performance of Solver and Judge themselves.
-
-```
-[judge] > /evaluator
-
-[evaluator] > Evaluate the system's performance on the last prompt
-
-╭────────────── Meta Evaluation ────────────────╮
-│  Solver Assessment                            │
-│    task_completion: 0.85                      │
-│    efficiency: 0.70                           │
-│    reasoning_quality: 0.80                    │
-│                                               │
-│  Judge Assessment                             │
-│    scoring_accuracy: 0.90                     │
-│    issue_coverage: 0.75                       │
-│    suggestion_actionability: 0.80             │
-│                                               │
-│  System Insights                              │
-│    bottleneck: Solver lacks systematic testing│
-│    suggestion: Add auto test case generation  │
-│                                               │
-│  Success Probability: 0.78                    │
-╰───────────────────────────────────────────────╯
-```
-
-### 4. Workflow Mode (Full Pipeline)
-
-Runs Solver → Judge → Auto-Improve loop until score >= 6.0
-
-```
-[solver+judge] > /workflow Write a literature review on RL for robotics
-
-⠋ Running workflow...
-
-╭──────────────── Final Output ─────────────────╮
-│ # Literature Review: RL for Robotics          │
-│ ## 1. Introduction ...                        │
-│ ## 2. Key Methods ...                         │
-╰───────────────────────────────────────────────╯
-
-╭─────────── Workflow Complete ─────────────────╮
-│  Status      Success                          │
-│  Final Score 7.8/10                           │
-│  Iterations  2                                │
-│  Verdict     ACCEPT                           │
-╰───────────────────────────────────────────────╯
+[solver] > /judge
+[judge] > Score the current report against the project checklist.
 ```
 
 ### CLI One-Shot Commands
 
 ```bash
-# Solver + Judge (default)
-markscientist "Explain quicksort algorithm"
+# Full Challenger -> Solver -> Judge workflow
+markscientist "Study whether the benchmark result is reproducible"
 
-# Solver only (no auto-review)
-markscientist "Explain quicksort" --no-review
+# Challenger only
+markscientist "Prepare a project for evaluating the dataset" --agent challenger
+
+# Solver only
+markscientist "Execute the prepared project" --agent solver
 
 # Judge only
-markscientist "Review this code..." --agent judge
-
-# Evaluator only
-markscientist "Assess system performance" --agent evaluator
-
-# Full workflow with improvement loop
-markscientist "Write a research proposal" --workflow
+markscientist "Review the current report" --agent judge
 
 # JSON output
-markscientist "Analyze this data" --json
+markscientist "Review the current report" --agent judge --json
 ```
 
 ### Python API
@@ -268,52 +236,33 @@ config = Config.from_env()
 config.workspace_root = Path("./workspace")
 set_config(config)
 
-from markscientist.agents import SolverAgent
-from markscientist.workflow import BasicResearchWorkflow
+from markscientist.agents import ChallengerAgent, JudgeAgent, SolverAgent
+from markscientist.workflow import ResearchWorkflow
 
-solver = SolverAgent(config=config)
-solver_result = solver.run("Implement binary search", workspace_root=config.workspace_root)
-print(solver_result.output)
+challenger = ChallengerAgent(config=config, workspace_root=config.workspace_root)
+challenger.run("Prepare a research project for the current prompt.", workspace_root=config.workspace_root)
 
-workflow = BasicResearchWorkflow(config=config)
-workflow_result = workflow.run("Write a literature review", workspace_root=config.workspace_root)
+solver = SolverAgent(config=config, workspace_root=config.workspace_root)
+solver_result = solver.run("Execute the prepared project.", workspace_root=config.workspace_root)
+
+judge = JudgeAgent(config=config, workspace_root=config.workspace_root)
+judge_result = judge.run("Review the current report strictly.", workspace_root=config.workspace_root)
+
+workflow = ResearchWorkflow(config=config)
+workflow_result = workflow.run("Write a research report", workspace_root=config.workspace_root)
 print(workflow_result.final_score)
-print(workflow_result.metadata["workspace_root"])
+print(workflow_result.metadata["report_path"])
 ```
-
-## 🐾 Reviewer Buddies
-
-| Buddy | Name | Focus |
-|:-----:|------|-------|
-| `((•)(•))` | Professor Owl | Methodology |
-| `=•ω•=` | Dr. Whiskers | Details |
-| `[•=•]` | EVAL-9000 | Metrics |
-| `<•~•>` | Elder Dragon | Big Picture |
-| `/• •\` | The Specter | Hidden Issues |
-| `~(••)~` | Dr. Tentacle | Multi-angle |
 
 ## 📋 Commands
 
 ```
-/help       Show commands        /workflow   Full pipeline
-/solver     Solver mode          /review     Toggle auto-review
-/judge      Judge mode           /model      Switch model
-/evaluator  Evaluator mode       /config     Show config
-/clear      New session
+/help        Show commands       /workflow    Full workflow
+/challenger  Challenger mode     /solver      Solver mode
+/judge       Judge mode          /model       Switch model
+/config      Show config         /clear       New session
+/exit        Exit
 ```
-
-## 🎯 Task Types
-
-| Type | Scoring Dimensions |
-|------|-------------------|
-| `factual_query` | accuracy, completeness, clarity |
-| `idea_proposal` | novelty, rigor, feasibility |
-| `code_analysis` | correctness, depth, clarity |
-| `literature_review` | coverage, synthesis, organization |
-| `experiment_design` | methodology, validity, reproducibility |
-| `writing_draft` | structure, clarity, coherence |
-| `data_analysis` | accuracy, interpretation, visualization |
-| `problem_solving` | correctness, efficiency, explanation |
 
 ## ⚙️ Config
 
@@ -328,12 +277,17 @@ Agent runtime defaults and trajectory defaults live in code. Override them progr
 
 If you need a non-default workspace root or `ResearchHarness` checkout, set `config.workspace_root` or `config.harness_path` before creating agents.
 
-## 🗺️ Roadmap
+## 🧪 Testing
 
-- [x] v0.1 — Three agents, multi-type Judge, Buddies
-- [ ] v0.2 — Enhanced data collection
-- [ ] v0.3 — Workflow optimization
-- [ ] v1.0 — Stronger workflow policies, richer evaluation, better high-level testing
+```bash
+PYTHONDONTWRITEBYTECODE=1 pytest -q -p no:cacheprovider tests/test_agents.py tests/test_workflow.py tests/test_cli.py
+```
+
+The test suite checks:
+
+- role agents inheriting the ResearchHarness base agent
+- the Challenger -> Solver -> Judge workflow loop
+- CLI JSON output and single-agent entry points
 
 ## 🪪 License
 
