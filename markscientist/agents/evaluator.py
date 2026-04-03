@@ -40,48 +40,44 @@ class MetaEvaluationResult:
         return self.raw_output
 
 
+def _build_evaluation_prompt(
+    original_prompt: str,
+    solver_output: str,
+    judge_review: str,
+    solver_trace_summary: Optional[str] = None,
+    final_result: Optional[str] = None,
+) -> str:
+    return META_EVALUATION_TEMPLATE.format(
+        original_task=original_prompt,
+        solver_output=solver_output[:2000] if len(solver_output) > 2000 else solver_output,
+        solver_trajectory_summary=solver_trace_summary or "Not provided",
+        judge_review=judge_review,
+        final_result=final_result or solver_output[:500],
+    )
+
+
+def _parse_evaluation_output(raw_output: str) -> MetaEvaluationResult:
+    evaluation = MetaEvaluationResult(raw_output=raw_output)
+    json_match = re.search(r"\{[\s\S]*\}", raw_output)
+    if not json_match:
+        evaluation.meta_summary = raw_output[:500]
+        return evaluation
+    try:
+        data = json.loads(json_match.group())
+    except (json.JSONDecodeError, ValueError):
+        evaluation.meta_summary = raw_output[:500]
+        return evaluation
+    evaluation.solver_assessment = data.get("solver_assessment", {})
+    evaluation.judge_assessment = data.get("judge_assessment", {})
+    evaluation.system_insights = data.get("system_insights", {})
+    evaluation.success_probability = float(data.get("success_probability", 0))
+    evaluation.confidence = float(data.get("confidence", 0))
+    evaluation.meta_summary = data.get("meta_summary", "")
+    return evaluation
+
+
 @agent_role(name="evaluator", role_prompt=EVALUATOR_ROLE_PROMPT, function_list=[])
 class EvaluatorAgent(BaseScientistAgent):
     """Meta-evaluator for Solver and Judge behavior."""
 
     agent_type = "evaluator"
-
-    def evaluate(
-        self,
-        original_task: str,
-        solver_output: str,
-        judge_review: str,
-        solver_trajectory_summary: Optional[str] = None,
-        final_result: Optional[str] = None,
-    ) -> MetaEvaluationResult:
-        task = META_EVALUATION_TEMPLATE.format(
-            original_task=original_task,
-            solver_output=solver_output[:2000] if len(solver_output) > 2000 else solver_output,
-            solver_trajectory_summary=solver_trajectory_summary or "Not provided",
-            judge_review=judge_review,
-            final_result=final_result or solver_output[:500],
-        )
-        result = self.run(task)
-        evaluation = self._parse_evaluation_result(result.output)
-        evaluation.termination_reason = result.termination_reason
-        evaluation.metadata = dict(result.metadata)
-        return evaluation
-
-    def _parse_evaluation_result(self, raw_output: str) -> MetaEvaluationResult:
-        evaluation = MetaEvaluationResult(raw_output=raw_output)
-        json_match = re.search(r"\{[\s\S]*\}", raw_output)
-        if not json_match:
-            evaluation.meta_summary = raw_output[:500]
-            return evaluation
-        try:
-            data = json.loads(json_match.group())
-        except (json.JSONDecodeError, ValueError):
-            evaluation.meta_summary = raw_output[:500]
-            return evaluation
-        evaluation.solver_assessment = data.get("solver_assessment", {})
-        evaluation.judge_assessment = data.get("judge_assessment", {})
-        evaluation.system_insights = data.get("system_insights", {})
-        evaluation.success_probability = float(data.get("success_probability", 0))
-        evaluation.confidence = float(data.get("confidence", 0))
-        evaluation.meta_summary = data.get("meta_summary", "")
-        return evaluation

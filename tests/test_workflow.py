@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 from markscientist.agents.base import AgentResult
@@ -13,7 +14,7 @@ class FakeSolver:
         self.trace_path = trace_path
         self.index = 0
 
-    def run(self, task, context=None, workspace_dir=None):
+    def run(self, prompt, workspace_root=None):
         output = self.outputs[self.index]
         self.index += 1
         return AgentResult(
@@ -30,20 +31,23 @@ class FakeJudge:
         self.trace_path = trace_path
         self.index = 0
 
-    def review(self, artifact, artifact_type="auto", requirements=None):
+    def run(self, prompt, workspace_root=None):
         review = self.reviews[self.index]
         self.index += 1
-        review.metadata = {"trace_path": str(self.trace_path)}
-        review.termination_reason = "result"
-        return review
+        return AgentResult(
+            output=json.dumps(review.to_dict(), ensure_ascii=False),
+            success=True,
+            termination_reason="result",
+            metadata={"trace_path": str(self.trace_path)},
+        )
 
 
 class FakeEvaluator:
     def __init__(self, trace_path):
         self.trace_path = trace_path
 
-    def evaluate(self, **kwargs):
-        return MetaEvaluationResult(
+    def run(self, prompt, workspace_root=None):
+        evaluation = MetaEvaluationResult(
             solver_assessment={"performance_score": 8},
             judge_assessment={"accuracy_score": 7},
             system_insights={"recommended_adjustments": ["tighten review rubric"]},
@@ -51,6 +55,10 @@ class FakeEvaluator:
             confidence=0.8,
             meta_summary="System is improving.",
             raw_output='{"success_probability": 0.82}',
+        )
+        return AgentResult(
+            output=json.dumps(evaluation.to_dict(), ensure_ascii=False),
+            success=True,
             termination_reason="result",
             metadata={"trace_path": str(self.trace_path)},
         )
@@ -63,15 +71,15 @@ class DummyWorkflow(BasicResearchWorkflow):
         self.fake_judge = None
         self.fake_evaluator = None
 
-    def _new_solver(self, workspace, trace_path, on_event=None):
+    def _new_solver(self, workspace_root, trace_dir, on_event=None):
         if self.fake_solver is None:
             self.fake_solver = FakeSolver(
                 outputs=["initial draft", "improved draft"],
-                trace_path=trace_path or workspace / "solver.jsonl",
+                trace_path=(trace_dir / "solver.jsonl") if trace_dir else workspace_root / "solver.jsonl",
             )
         return self.fake_solver
 
-    def _new_judge(self, workspace, trace_path, on_event=None):
+    def _new_judge(self, workspace_root, trace_dir, on_event=None):
         if self.fake_judge is None:
             self.fake_judge = FakeJudge(
                 reviews=[
@@ -90,13 +98,13 @@ class DummyWorkflow(BasicResearchWorkflow):
                         raw_output='{"overall_score": 7.5}',
                     ),
                 ],
-                trace_path=trace_path or workspace / "judge.jsonl",
+                trace_path=(trace_dir / "judge.jsonl") if trace_dir else workspace_root / "judge.jsonl",
             )
         return self.fake_judge
 
-    def _new_evaluator(self, workspace, trace_path, on_event=None):
+    def _new_evaluator(self, workspace_root, trace_dir, on_event=None):
         if self.fake_evaluator is None:
-            self.fake_evaluator = FakeEvaluator(trace_path or workspace / "evaluator.jsonl")
+            self.fake_evaluator = FakeEvaluator((trace_dir / "evaluator.jsonl") if trace_dir else workspace_root / "evaluator.jsonl")
         return self.fake_evaluator
 
 
@@ -114,7 +122,7 @@ def test_workflow_wraps_agent_traces(tmp_path: Path):
     assert result.final_score == 7.5
     assert result.improved_output == "improved draft"
 
-    workflow_json = list((tmp_path / "traces").glob("*_workflow.json"))
+    workflow_json = list((tmp_path / "traces").glob("**/workflow_*.json"))
     assert len(workflow_json) == 1
     payload = workflow_json[0].read_text(encoding="utf-8")
     assert "initial draft" in payload or "improved draft" in payload
@@ -125,7 +133,7 @@ def test_workflow_wraps_agent_traces(tmp_path: Path):
 
 
 class RejectedImprovementWorkflow(DummyWorkflow):
-    def _new_judge(self, workspace, trace_path, on_event=None):
+    def _new_judge(self, workspace_root, trace_dir, on_event=None):
         if self.fake_judge is None:
             self.fake_judge = FakeJudge(
                 reviews=[
@@ -144,7 +152,7 @@ class RejectedImprovementWorkflow(DummyWorkflow):
                         raw_output='{"overall_score": 5.5}',
                     ),
                 ],
-                trace_path=trace_path or workspace / "judge.jsonl",
+                trace_path=(trace_dir / "judge.jsonl") if trace_dir else workspace_root / "judge.jsonl",
             )
         return self.fake_judge
 
@@ -166,7 +174,7 @@ def test_workflow_keeps_last_accepted_output(tmp_path: Path):
     assert result.solver_output == "initial draft"
     assert result.improved_output is None
 
-    workflow_json = list((tmp_path / "traces").glob("*_workflow.json"))
+    workflow_json = list((tmp_path / "traces").glob("**/workflow_*.json"))
     assert len(workflow_json) == 1
     payload = workflow_json[0].read_text(encoding="utf-8")
     assert '"final_output_preview": "initial draft"' in payload

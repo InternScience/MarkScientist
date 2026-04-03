@@ -76,33 +76,18 @@ class Config:
             if default_env.exists():
                 _load_dotenv(default_env)
 
+        default_model = ModelConfig()
+        default_agent = AgentConfig()
+        default_trajectory = TrajectoryConfig()
         model = ModelConfig(
-            model_name=os.getenv("MODEL_NAME", "gpt-5.4"),
+            model_name=os.getenv("MODEL_NAME", default_model.model_name),
             api_key=os.getenv("API_KEY"),
             api_base=os.getenv("API_BASE"),
         )
-        agent = AgentConfig(
-            max_llm_calls=int(os.getenv("MAX_LLM_CALL_PER_RUN", "100")),
-            max_runtime_seconds=int(os.getenv("MAX_AGENT_RUNTIME_SECONDS", "9000")),
-            max_output_tokens=int(os.getenv("LLM_MAX_OUTPUT_TOKENS", "10000")),
-            max_input_tokens=int(os.getenv("MAX_INPUT_TOKENS", "320000")),
-            max_retries=int(os.getenv("LLM_MAX_RETRIES", "10")),
-            temperature=float(os.getenv("TEMPERATURE", "0.6")),
-            top_p=float(os.getenv("TOP_P", "0.95")),
-            presence_penalty=float(os.getenv("PRESENCE_PENALTY", "1.1")),
-        )
-        trajectory = TrajectoryConfig(
-            auto_save=os.getenv("TRAJECTORY_AUTO_SAVE", "true").lower() == "true",
-            save_dir=Path(os.getenv("TRAJECTORY_DIR", "./data/trajectories")),
-        )
-        workspace = os.getenv("WORKSPACE_ROOT")
-        harness_path = os.getenv("RESEARCHHARNESS_PATH")
         return cls(
             model=model,
-            agent=agent,
-            trajectory=trajectory,
-            workspace_root=Path(workspace) if workspace else None,
-            harness_path=Path(harness_path) if harness_path else None,
+            agent=default_agent,
+            trajectory=default_trajectory,
         )
 
     def to_dict(self) -> Dict[str, Any]:

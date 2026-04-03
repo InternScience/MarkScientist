@@ -106,20 +106,6 @@ EVALUATOR_ROLE_PROMPT = _build_role_prompt(
     ],
 )
 
-
-ROLE_PROMPTS = {
-    "solver": SOLVER_ROLE_PROMPT,
-    "judge": JUDGE_ROLE_PROMPT,
-    "evaluator": EVALUATOR_ROLE_PROMPT,
-}
-
-
-def get_role_prompt(agent_type: str) -> str:
-    if agent_type not in ROLE_PROMPTS:
-        raise ValueError(f"Unknown agent type: {agent_type}. Available types: {sorted(ROLE_PROMPTS)}")
-    return ROLE_PROMPTS[agent_type]
-
-
 REVIEW_REQUEST_TEMPLATE = """Please evaluate the following output.
 
 ## Output Type Hint

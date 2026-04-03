@@ -1,6 +1,4 @@
 from __future__ import annotations
-
-import json
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional, Sequence
@@ -41,7 +39,7 @@ class BaseScientistAgent(MultiTurnReactAgent):
         config: Optional[Config] = None,
         role_prompt: Optional[str] = None,
         function_list: Optional[Sequence[str]] = None,
-        trace_path: Optional[Path | str] = None,
+        trace_dir: Optional[Path | str] = None,
         workspace_root: Optional[Path | str] = None,
         on_event: Optional[Callable[[Dict[str, Any]], None]] = None,
     ):
@@ -52,7 +50,7 @@ class BaseScientistAgent(MultiTurnReactAgent):
         super().__init__(
             function_list=self.resolve_function_list(function_list),
             llm=self._build_llm_config(self.config),
-            trace_path=str(trace_path) if trace_path else None,
+            trace_dir=str(trace_dir) if trace_dir else None,
             role_prompt=role_prompt,
             max_llm_calls=self.config.agent.max_llm_calls,
             max_runtime_seconds=self.config.agent.max_runtime_seconds,
@@ -74,23 +72,18 @@ class BaseScientistAgent(MultiTurnReactAgent):
             },
         }
 
-    def build_task_input(self, task: str, context: Optional[Dict[str, Any]] = None) -> str:
-        parts = [task.strip()]
-        if context:
-            parts.insert(0, "Context:\n" + json.dumps(context, ensure_ascii=False, indent=2))
-        return "\n\n".join(part for part in parts if part.strip())
-
     def run(
         self,
-        task: str,
-        context: Optional[Dict[str, Any]] = None,
-        workspace_dir: Optional[Path | str] = None,
+        prompt: str,
+        workspace_root: Optional[Path | str] = None,
     ) -> AgentResult:
-        task_input = self.build_task_input(task, context)
-        workspace_root = workspace_dir or self.default_workspace_root
+        prompt_text = prompt.strip()
+        if not prompt_text:
+            raise ValueError("prompt must be a non-empty string.")
+        workspace_root = workspace_root or self.default_workspace_root
         session = self._run_session(
-            task_input,
-            workspace_dir=str(workspace_root) if workspace_root else None,
+            prompt_text,
+            workspace_root=str(workspace_root) if workspace_root else None,
             event_callback=self.on_event,
         )
         termination = str(session.get("termination", ""))

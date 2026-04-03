@@ -9,7 +9,7 @@ from markscientist.config import Config, TrajectoryConfig
 
 
 class FakeSolverAgent:
-    def run(self, task):
+    def run(self, prompt, workspace_root=None):
         return AgentResult(
             output="solver output",
             success=True,
@@ -20,26 +20,32 @@ class FakeSolverAgent:
 
 class FakeJudgeAgent:
     def __init__(self):
-        self.artifacts = []
+        self.prompts = []
 
-    def review(self, artifact, artifact_type="auto", requirements=None):
-        self.artifacts.append((artifact, artifact_type, requirements))
-        return ReviewResult(
+    def run(self, prompt, workspace_root=None):
+        self.prompts.append(prompt)
+        review = ReviewResult(
             task_type="code_analysis",
             overall_score=7.5,
             verdict="Good",
             summary="Looks solid.",
             raw_output='{"overall_score": 7.5}',
         )
+        return AgentResult(
+            output=json.dumps(review.to_dict(), ensure_ascii=False),
+            success=True,
+            termination_reason="result",
+            metadata={"trace_path": ""},
+        )
 
 
 class FakeEvaluatorAgent:
     def __init__(self):
-        self.calls = []
+        self.prompts = []
 
-    def evaluate(self, **kwargs):
-        self.calls.append(kwargs)
-        return MetaEvaluationResult(
+    def run(self, prompt, workspace_root=None):
+        self.prompts.append(prompt)
+        evaluation = MetaEvaluationResult(
             solver_assessment={"performance_score": 8},
             judge_assessment={"accuracy_score": 7},
             system_insights={"recommended_adjustments": ["tighten review rubric"]},
@@ -47,6 +53,12 @@ class FakeEvaluatorAgent:
             confidence=0.8,
             meta_summary="System is improving.",
             raw_output='{"success_probability": 0.82}',
+        )
+        return AgentResult(
+            output=json.dumps(evaluation.to_dict(), ensure_ascii=False),
+            success=True,
+            termination_reason="result",
+            metadata={"trace_path": ""},
         )
 
 
@@ -73,7 +85,7 @@ def test_run_query_uses_specialized_review_paths(tmp_path: Path):
         trajectory=TrajectoryConfig(auto_save=False, save_dir=tmp_path / "traces"),
     )
     cli = FakeCLI(config)
-    cli._last_task = "prior task"
+    cli._last_prompt = "prior prompt"
     cli._last_output = "prior output"
     cli._last_review_raw = '{"overall_score": 7.5}'
 
@@ -81,9 +93,9 @@ def test_run_query_uses_specialized_review_paths(tmp_path: Path):
     eval_payload = json.loads(cli.run_query("evaluate session", "evaluator", show_spinner=False))
 
     assert review_payload["overall_score"] == 7.5
-    assert cli.judge.artifacts == [("artifact body", "auto", None)]
+    assert "artifact body" in cli.judge.prompts[0]
     assert eval_payload["success_probability"] == 0.82
-    assert cli.evaluator.calls[0]["solver_output"] == "prior output"
+    assert "prior output" in cli.evaluator.prompts[0]
 
 
 def test_run_once_solver_json_output(monkeypatch, capsys, tmp_path: Path):

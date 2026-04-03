@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, Optional
 
@@ -13,22 +14,22 @@ class WorkflowTrajectoryRecorder:
     def __init__(
         self,
         *,
-        task: str,
+        prompt: str,
         model_name: str,
         workspace_root: str,
         save_dir: Optional[Path] = None,
     ):
         self.record = WorkflowTraceRecord(
-            task=task,
+            prompt=prompt,
             workspace_root=str(workspace_root),
             model_name=model_name,
         )
         self.save_dir = Path(save_dir) if save_dir else None
 
-    def trace_path_for(self, agent_type: str) -> Optional[Path]:
+    def trace_dir_for(self, agent_type: str) -> Optional[Path]:
         if self.save_dir is None:
             return None
-        return self.save_dir / f"{self.record.workflow_id}_{agent_type}.jsonl"
+        return self.save_dir / self.record.workflow_id / agent_type
 
     def capture_agent_result(self, agent_type: str, result) -> None:
         metadata = dict(getattr(result, "metadata", {}) or {})
@@ -58,8 +59,10 @@ class WorkflowTrajectoryRecorder:
             metadata=metadata,
         )
         if self.save_dir is not None:
-            self.save_dir.mkdir(parents=True, exist_ok=True)
-            path = self.save_dir / f"{self.record.workflow_id}_workflow.json"
+            workflow_dir = self.save_dir / self.record.workflow_id
+            workflow_dir.mkdir(parents=True, exist_ok=True)
+            timestamp = datetime.now().astimezone().strftime("%Y%m%d_%H%M%S")
+            path = workflow_dir / f"workflow_{timestamp}_{self.record.workflow_id[:12]}.json"
             path.write_text(json.dumps(self.record.to_dict(), ensure_ascii=False, indent=2), encoding="utf-8")
         return self.record
 

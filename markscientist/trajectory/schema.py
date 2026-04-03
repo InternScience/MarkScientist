@@ -31,7 +31,7 @@ class WorkflowTraceRecord:
     version: str = "0.2"
     created_at: str = field(default_factory=lambda: datetime.now().astimezone().isoformat(timespec="seconds"))
     completed_at: Optional[str] = None
-    task: str = ""
+    prompt: str = ""
     workspace_root: str = ""
     model_name: str = ""
     solver: Optional[AgentTraceRef] = None

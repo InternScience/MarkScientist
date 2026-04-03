@@ -79,7 +79,7 @@ pip install -e .
 markscientist
 ```
 
-`MarkScientist` currently assumes a source checkout with the `ResearchHarness` git submodule available. Wheel-only installs are not a supported standalone distribution mode unless you point `RESEARCHHARNESS_PATH` at an external checkout.
+`MarkScientist` currently assumes a source checkout with the `ResearchHarness` git submodule available. Wheel-only installs are not a supported standalone distribution mode.
 
 ## 🧠 How It Works
 
@@ -191,7 +191,7 @@ Evaluates the performance of Solver and Judge themselves.
 ```
 [judge] > /evaluator
 
-[evaluator] > Evaluate the system's performance on the last task
+[evaluator] > Evaluate the system's performance on the last prompt
 
 ╭────────────── Meta Evaluation ────────────────╮
 │  Solver Assessment                            │
@@ -268,25 +268,17 @@ config = Config.from_env()
 config.workspace_root = Path("./workspace")
 set_config(config)
 
-from markscientist.agents import EvaluatorAgent, JudgeAgent, SolverAgent
+from markscientist.agents import SolverAgent
+from markscientist.workflow import BasicResearchWorkflow
 
 solver = SolverAgent(config=config)
-result = solver.run("Implement binary search")
-print(result.output)
+solver_result = solver.run("Implement binary search", workspace_root=config.workspace_root)
+print(solver_result.output)
 
-judge = JudgeAgent(config=config)
-review = judge.review(artifact=result.output, artifact_type="code_analysis")
-print(f"Score: {review.overall_score}/10")
-print(f"Issues: {review.weaknesses}")
-
-evaluator = EvaluatorAgent(config=config)
-meta = evaluator.evaluate(
-    original_task="Implement binary search",
-    solver_output=result.output,
-    judge_review=review.raw_output,
-)
-print(f"Success Probability: {meta.success_probability}")
-print(f"System Insights: {meta.system_insights}")
+workflow = BasicResearchWorkflow(config=config)
+workflow_result = workflow.run("Write a literature review", workspace_root=config.workspace_root)
+print(workflow_result.final_score)
+print(workflow_result.metadata["workspace_root"])
 ```
 
 ## 🐾 Reviewer Buddies
@@ -330,10 +322,11 @@ print(f"System Insights: {meta.system_insights}")
 API_KEY=your-key
 API_BASE=https://your-openai-compatible-endpoint/v1
 MODEL_NAME=gpt-5.4
-RESEARCHHARNESS_PATH=./vendor/ResearchHarness
 ```
 
-If you need a non-default `ResearchHarness` checkout programmatically, call `set_config(config)` before importing `markscientist.agents`.
+Agent runtime defaults and trajectory defaults live in code. Override them programmatically on `Config(...)` when needed.
+
+If you need a non-default workspace root or `ResearchHarness` checkout, set `config.workspace_root` or `config.harness_path` before creating agents.
 
 ## 🗺️ Roadmap
 

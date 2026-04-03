@@ -59,59 +59,47 @@ class ReviewResult:
         return self.raw_output
 
 
+def _build_review_prompt(
+    artifact: str,
+    artifact_type: str = "auto",
+    requirements: Optional[str] = None,
+) -> str:
+    type_hint = (
+        "Please infer the task type from the artifact."
+        if artifact_type == "auto"
+        else f"Task type hint: {artifact_type}"
+    )
+    return REVIEW_REQUEST_TEMPLATE.format(
+        artifact_type=type_hint,
+        content=artifact,
+        requirements=requirements or "Evaluate using task-appropriate criteria.",
+    )
+
+
+def _parse_review_output(raw_output: str) -> ReviewResult:
+    review = ReviewResult(raw_output=raw_output)
+    json_match = re.search(r"\{[\s\S]*\}", raw_output)
+    if not json_match:
+        review.summary = raw_output[:500]
+        return review
+    try:
+        data = json.loads(json_match.group())
+    except (json.JSONDecodeError, ValueError):
+        review.summary = raw_output[:500]
+        return review
+    review.task_type = data.get("task_type", "unknown")
+    review.overall_score = float(data.get("overall_score", 0))
+    review.dimension_scores = data.get("dimension_scores", {})
+    review.verdict = data.get("verdict", "")
+    review.summary = data.get("summary", "")
+    review.strengths = data.get("strengths", [])
+    review.weaknesses = data.get("weaknesses", [])
+    review.confidence = float(data.get("confidence", 0))
+    return review
+
+
 @agent_role(name="judge", role_prompt=JUDGE_ROLE_PROMPT, function_list=[])
 class JudgeAgent(BaseScientistAgent):
     """Evaluation agent for artifacts."""
 
     agent_type = "judge"
-
-    def review(
-        self,
-        artifact: str,
-        artifact_type: str = "auto",
-        requirements: Optional[str] = None,
-    ) -> ReviewResult:
-        type_hint = (
-            "Please infer the task type from the artifact."
-            if artifact_type == "auto"
-            else f"Task type hint: {artifact_type}"
-        )
-        task = REVIEW_REQUEST_TEMPLATE.format(
-            artifact_type=type_hint,
-            content=artifact,
-            requirements=requirements or "Evaluate using task-appropriate criteria.",
-        )
-        result = self.run(task)
-        review = self._parse_review_result(result.output)
-        review.termination_reason = result.termination_reason
-        review.metadata = dict(result.metadata)
-        return review
-
-    def _parse_review_result(self, raw_output: str) -> ReviewResult:
-        review = ReviewResult(raw_output=raw_output)
-        json_match = re.search(r"\{[\s\S]*\}", raw_output)
-        if not json_match:
-            review.summary = raw_output[:500]
-            return review
-        try:
-            data = json.loads(json_match.group())
-        except (json.JSONDecodeError, ValueError):
-            review.summary = raw_output[:500]
-            return review
-        review.task_type = data.get("task_type", "unknown")
-        review.overall_score = float(data.get("overall_score", 0))
-        review.dimension_scores = data.get("dimension_scores", {})
-        review.verdict = data.get("verdict", "")
-        review.summary = data.get("summary", "")
-        review.strengths = data.get("strengths", [])
-        review.weaknesses = data.get("weaknesses", [])
-        review.confidence = float(data.get("confidence", 0))
-        return review
-
-    def quick_score(self, artifact: str) -> Dict[str, Any]:
-        review = self.review(artifact=artifact, artifact_type="auto")
-        return {
-            "task_type": review.task_type,
-            "score": review.overall_score,
-            "verdict": review.verdict or review.summary,
-        }
