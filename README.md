@@ -1,15 +1,15 @@
 <div align="center">
 
-# 🔬 MarkScientist
+# MarkScientist
 
 **Self-evolving Research Agent with Built-in Scientific Taste**
 
-**Solver executes → Judge reviews → Evaluator improves**
+**Proposer hypothesizes → Solver executes → Reviewer critiques → Iteration**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
 [![Built On](https://img.shields.io/badge/Built%20On-ResearchHarness-2563eb.svg)](https://github.com/black-yt/ResearchHarness)
-[![Workflow](https://img.shields.io/badge/Workflow-Solver%20Judge%20Evaluator-4f46e5.svg)](#-how-it-works)
+[![Workflow](https://img.shields.io/badge/Workflow-Proposer%20Solver%20Reviewer-4f46e5.svg)](#-how-it-works)
 [![Trace](https://img.shields.io/badge/Trace-Workflow%20Summary-0f766e.svg)](#-how-it-works)
 [![Scope](https://img.shields.io/badge/Scope-Orchestration%20Layer-orange.svg)](#-architecture-boundary)
 
@@ -17,61 +17,99 @@
 
 MarkScientist is a higher-layer framework for running **role-specialized agents**, **review-driven improvement loops**, and **workflow-level evaluation** on top of ResearchHarness.
 
-Unlike a standalone execution harness, this project is intentionally centered on:
+## Scientific Workflow Model
 
-- Solver, Judge, and Evaluator role separation
-- iterative review and improvement loops
-- workflow-level traces layered on top of per-agent harness traces
-- higher-level orchestration and evaluation policies
-- a CLI that exposes system behavior across multiple agents
+The role model is inspired by the scientific method and AI Scientist workflows:
 
-The point is not to replace ResearchHarness. The point is to build a **multi-agent scientific workflow layer** that reuses the lower-layer runtime while adding role structure, review pressure, and orchestration logic.
+```mermaid
+flowchart TD
+    subgraph JB[JudgeBuddy System]
+        JB_DESC[15 Scenarios · 12 Roles · 5 Skills]
+    end
+
+    U[User Prompt] --> WF[Workflow Scheduler]
+    WF --> P[Proposer]
+    P --> PO([Proposal])
+    PO --> R1[Review]
+    R1 --> S[Solver]
+    S --> SO([Output])
+    SO --> R2[Review]
+    R2 --> F{Next Action}
+    F -->|revise| S
+    F -->|repropose| P
+    F -->|accept| R3[Review]
+    R3 --> DONE([Workflow Complete])
+    WF --> T[(Workflow Trace)]
+
+    R1 -.->|Auto Review| JB
+    R2 -.->|Auto Review| JB
+    R3 -.->|Auto Review| JB
+    R1 -.->|User Feedback| TL[(Taste Learning)]
+    R2 -.->|User Feedback| TL
+    R3 -.->|User Feedback| TL
+    TL -.->|Update| JB
+
+    style PO fill:#e1f5fe
+    style SO fill:#e1f5fe
+    style DONE fill:#c8e6c9
+    style TL fill:#fff3e0
+    style T fill:#fff3e0
+    style JB fill:#f3e5f5
+```
+
+This project is intentionally centered on:
+
+- **Role separation**: Proposer, Solver, and Reviewer with distinct responsibilities
+- **Review pressure**: JudgeBuddy system with scenario-aware, role-specialized evaluation
+- **Multi-mode evaluation**: Single, panel, pairwise comparison, and claim validation
+- **Taste learning**: Calibrate reviewer standards through user feedback over time
 
 ---
 
-## 📚 Table of Contents
+## Table of Contents
 
-- [✨ Highlights](#-highlights)
-- [⚡ Quick Start](#-quick-start)
-- [🧠 How It Works](#-how-it-works)
-- [🧭 Architecture Boundary](#-architecture-boundary)
-- [💬 Usage](#-usage)
-- [🐾 Reviewer Buddies](#-reviewer-buddies)
-- [📋 Commands](#-commands)
-- [🎯 Task Types](#-task-types)
-- [⚙️ Config](#️-config)
-- [🗺️ Roadmap](#️-roadmap)
-- [🪪 License](#-license)
+- [Highlights](#highlights)
+- [Quick Start](#quick-start)
+- [How It Works](#how-it-works)
+- [Architecture Boundary](#architecture-boundary)
+- [Usage](#usage)
+- [Reviewer Buddies](#reviewer-buddies)
+- [JudgeBuddy System](#judgebuddy-system)
+- [Commands](#commands)
+- [Task Types](#task-types)
+- [Config](#config)
+- [Roadmap](#roadmap)
+- [License](#license)
 
 ---
 
-## ✨ Highlights
+## Highlights
 
 - **Built on ResearchHarness**
-  ResearchHarness owns SDK calls, tool calling, and the ReAct loop; MarkScientist owns multi-agent roles and workflow orchestration.
-- **Three-agent workflow**
-  Solver executes, Judge reviews, and Evaluator inspects system-level behavior.
-- **Review-driven improvement**
-  The workflow can iteratively improve outputs based on Judge feedback instead of stopping at one draft.
-- **Workflow-level traces**
-  MarkScientist preserves per-agent ResearchHarness traces and adds a higher-level workflow summary.
-- **Task-aware review**
-  Judge supports multiple task types with task-appropriate scoring dimensions.
-- **Reviewer buddies**
-  The CLI includes lightweight reviewer personas for more readable interactive evaluation.
+  Reuses ResearchHarness for execution; adds multi-agent roles and workflow orchestration.
+- **Proposer → Solver → Reviewer**
+  Three-agent workflow with iterative review-driven improvement loops.
+- **JudgeBuddy system**
+  15 research scenarios × 12 reviewer roles × 5 scoring skills (G-Eval, Prometheus, AlpacaEval, PandaLM, JudgeLM).
+- **Multi-mode evaluation**
+  Single review, panel review, pairwise comparison, and claim validation.
+- **Taste learning**
+  Collects user feedback to calibrate reviewer standards and develop personalized scientific taste.
 
 ### At a Glance
 
 | Area | What MarkScientist focuses on |
 | --- | --- |
 | Runtime dependency | Reuses ResearchHarness for execution |
-| Roles | Solver, Judge, Evaluator |
+| Roles | Proposer, Solver, Reviewer |
 | Review model | Score, critique, and improve |
+| JudgeBuddy | 15 scenarios × 12 roles × 5 skills |
+| Evaluation modes | Single, Panel, Pairwise, Claim validation |
 | Trace model | Workflow summary plus per-agent traces |
-| UX | Interactive multi-agent CLI |
+| UX | Arrow-key CLI with reviewer buddies |
 | Scope | Orchestration layer, not execution harness |
 
-## 🚀 Quick Start
+## Quick Start
 
 ```bash
 git submodule update --init --recursive
@@ -81,7 +119,7 @@ markscientist
 
 `MarkScientist` currently assumes a source checkout with the `ResearchHarness` git submodule available. Wheel-only installs are not a supported standalone distribution mode unless you point `RESEARCHHARNESS_PATH` at an external checkout.
 
-## 🧠 How It Works
+## How It Works
 
 `MarkScientist` is not a second execution harness. It is a higher-layer framework built on top of `ResearchHarness`.
 
@@ -89,11 +127,12 @@ markscientist
 flowchart TD
     U[User Task] --> CLI[CLI / Entry Points]
     CLI --> WF[Workflow Scheduler]
+    WF --> P[Proposer]
     WF --> S[Solver]
-    WF --> J[Judge]
-    WF --> E[Evaluator]
+    WF --> R[Reviewer]
+    P --> S
     S --> IL[Improvement Loop]
-    J --> IL
+    R --> IL
     IL --> WF
     WF --> RP[Role Prompt Addenda]
     WF --> WR[Workflow-Level Trace Summary]
@@ -123,7 +162,7 @@ flowchart TD
     WR --> TRACE
 ```
 
-## 🧭 Architecture Boundary
+## Architecture Boundary
 
 - `ResearchHarness` is the execution layer:
   - OpenAI-compatible SDK calls
@@ -132,164 +171,110 @@ flowchart TD
   - tool registry and execution
   - flat per-agent trace writing
 - `MarkScientist` is the orchestration layer:
-  - Solver / Judge / Evaluator agent roles
+  - Proposer / Solver / Reviewer agent roles
   - workflow scheduling and improvement loops
   - role-specific prompt addenda
   - workflow-level trajectory summaries
 
 `MarkScientist` agents inherit the ResearchHarness agent base instead of reimplementing the lower-layer execution stack.
 
-## 💬 Usage
+## Usage
 
-### Interactive REPL
+### Workflow Mode
 
-```bash
-markscientist          # Start REPL (Solver + auto Judge review)
-```
-
-### 1. Solver Mode (Default, with Auto-Review)
-
-```
-[solver+judge] > What is the transformer architecture?
-
-╭──────────────── Solver Output ────────────────╮
-│ The Transformer was proposed in "Attention   │
-│ Is All You Need" by Vaswani et al. in 2017...│
-╰──────────────────────────────────────────────╯
-
-((•)(•)) =•ω•= [•=•] /• •\ Summoning reviewer...
-
-[•=•] EVAL-9000 appears! "Computing evaluation scores..."
-
-╭─────────── The Objective Analyzer ───────────╮
-│  Reaction   ✓ Excellent!                     │
-│  Type       factual_query                    │
-│  Score      8.5/10                           │
-╰──────────────────────────────────────────────╯
-```
-
-### 2. Judge Mode (Review Artifacts)
-
-```
-[solver+judge] > /judge
-
-[judge] > Review this code:
-def fib(n): return fib(n-1)+fib(n-2) if n>1 else n
-
-╭──────────────── Judge Review ─────────────────╮
-│  Type       code_analysis                     │
-│  Score      5.5/10                            │
-│  Details    correctness: 7.0 | efficiency: 3.0│
-│  Issues     No memoization; O(2^n) complexity │
-╰───────────────────────────────────────────────╯
-```
-
-### 3. Evaluator Mode (Meta-Evaluation)
-
-Evaluates the performance of Solver and Judge themselves.
-
-```
-[judge] > /evaluator
-
-[evaluator] > Evaluate the system's performance on the last task
-
-╭────────────── Meta Evaluation ────────────────╮
-│  Solver Assessment                            │
-│    task_completion: 0.85                      │
-│    efficiency: 0.70                           │
-│    reasoning_quality: 0.80                    │
-│                                               │
-│  Judge Assessment                             │
-│    scoring_accuracy: 0.90                     │
-│    issue_coverage: 0.75                       │
-│    suggestion_actionability: 0.80             │
-│                                               │
-│  System Insights                              │
-│    bottleneck: Solver lacks systematic testing│
-│    suggestion: Add auto test case generation  │
-│                                               │
-│  Success Probability: 0.78                    │
-╰───────────────────────────────────────────────╯
-```
-
-### 4. Workflow Mode (Full Pipeline)
-
-Runs Solver → Judge → Auto-Improve loop until score >= 6.0
-
-```
-[solver+judge] > /workflow Write a literature review on RL for robotics
-
-⠋ Running workflow...
-
-╭──────────────── Final Output ─────────────────╮
-│ # Literature Review: RL for Robotics          │
-│ ## 1. Introduction ...                        │
-│ ## 2. Key Methods ...                         │
-╰───────────────────────────────────────────────╯
-
-╭─────────── Workflow Complete ─────────────────╮
-│  Status      Success                          │
-│  Final Score 7.8/10                           │
-│  Iterations  2                                │
-│  Verdict     ACCEPT                           │
-╰───────────────────────────────────────────────╯
-```
-
-### CLI One-Shot Commands
+The workflow runs **Proposer → Reviewer → Solver → Reviewer** in a loop until the final score meets the threshold.
 
 ```bash
-# Solver + Judge (default)
-markscientist "Explain quicksort algorithm"
-
-# Solver only (no auto-review)
-markscientist "Explain quicksort" --no-review
-
-# Judge only
-markscientist "Review this code..." --agent judge
-
-# Evaluator only
-markscientist "Assess system performance" --agent evaluator
-
-# Full workflow with improvement loop
-markscientist "Write a research proposal" --workflow
-
-# JSON output
-markscientist "Analyze this data" --json
+markscientist --workflow "Write a literature review on RL for robotics"
 ```
 
-### Python API
+#### Step 1: Proposer generates a research proposal
 
-```python
-from pathlib import Path
+```
+╭──────────────── Proposer Input ──────────────────╮
+│  Task: "Write a literature review on RL for      │
+│         robotics"                                │
+╰──────────────────────────────────────────────────╯
 
-from markscientist.config import Config, set_config
+╭──────────────── Proposer Output ─────────────────╮
+│  Topic       RL for Robotics Literature Review   │
+│  Hypothesis  Deep RL approaches have become the  │
+│              dominant paradigm for robot control │
+│  Scope       Survey methods from 2018-2024       │
+│  Criteria    coverage, synthesis, organization   │
+╰──────────────────────────────────────────────────╯
 
-config = Config.from_env()
-config.workspace_root = Path("./workspace")
-set_config(config)
-
-from markscientist.agents import EvaluatorAgent, JudgeAgent, SolverAgent
-
-solver = SolverAgent(config=config)
-result = solver.run("Implement binary search")
-print(result.output)
-
-judge = JudgeAgent(config=config)
-review = judge.review(artifact=result.output, artifact_type="code_analysis")
-print(f"Score: {review.overall_score}/10")
-print(f"Issues: {review.weaknesses}")
-
-evaluator = EvaluatorAgent(config=config)
-meta = evaluator.evaluate(
-    original_task="Implement binary search",
-    solver_output=result.output,
-    judge_review=review.raw_output,
-)
-print(f"Success Probability: {meta.success_probability}")
-print(f"System Insights: {meta.system_insights}")
+╭──────────────── Proposer Review ─────────────────╮
+│  [•=•] EVAL-9000: "Evaluating proposal..."       │
+│  Score       7.5/10                              │
+│  Strengths   Clear scope, well-defined criteria  │
+│  Weaknesses  Could narrow focus to specific task │
+│  Verdict     ACCEPT                              │
+╰──────────────────────────────────────────────────╯
 ```
 
-## 🐾 Reviewer Buddies
+#### Step 2: Solver executes the proposal
+
+```
+╭──────────────── Solver Input ────────────────────╮
+│  Proposal: "Survey deep RL methods for robot     │
+│            control from 2018-2024, covering      │
+│            model-free, model-based, and sim2real │
+│            approaches"                           │
+│  Criteria: coverage, synthesis, organization     │
+╰──────────────────────────────────────────────────╯
+
+╭──────────────── Solver Output ───────────────────╮
+│  # Literature Review: RL for Robotics            │
+│  ## 1. Introduction                              │
+│  Reinforcement learning has transformed...       │
+│  ## 2. Model-Free Methods                        │
+│  PPO, SAC, and TD3 dominate continuous control...│
+│  ## 3. Model-Based Approaches                    │
+│  World models enable sample-efficient learning...│
+│  ## 4. Sim-to-Real Transfer                      │
+│  Domain randomization and adaptation...          │
+╰──────────────────────────────────────────────────╯
+
+╭──────────────── Solver Review ───────────────────╮
+│  ((•)(•)) Professor Owl: "Analyzing structure..."│
+│  Score       6.8/10                              │
+│  Strengths   Good organization, covers key areas │
+│  Weaknesses  Missing recent 2024 references      │
+│  Verdict     REVISE                              │
+╰──────────────────────────────────────────────────╯
+```
+
+#### Step 3: Iteration until acceptance
+
+```
+╭──────────────── Iteration 2 Input ───────────────╮
+│  Feedback: "Missing recent 2024 references"      │
+│  Action:   Revise with updated citations         │
+╰──────────────────────────────────────────────────╯
+
+╭──────────────── Iteration 2 Output ──────────────╮
+│  Solver revised with 2024 references added       │
+│  Score       8.2/10                              │
+│  Verdict     ACCEPT                              │
+╰──────────────────────────────────────────────────╯
+
+╭──────────────── Workflow Complete ───────────────╮
+│  Status      Success                             │
+│  Final Score 8.2/10                              │
+│  Iterations  2                                   │
+│  Verdict     ACCEPT                              │
+╰──────────────────────────────────────────────────╯
+```
+
+### CLI Options
+
+```bash
+markscientist --workflow "task"        # Full workflow with review loop
+markscientist --workflow "task" --json # JSON output for programmatic use
+```
+
+## Reviewer Buddies
 
 | Buddy | Name | Focus |
 |:-----:|------|-------|
@@ -300,17 +285,102 @@ print(f"System Insights: {meta.system_insights}")
 | `/• •\` | The Specter | Hidden Issues |
 | `~(••)~` | Dr. Tentacle | Multi-angle |
 
-## 📋 Commands
+## JudgeBuddy System
+
+The enhanced JudgeBuddy system provides scenario-aware, role-specialized evaluation:
+
+### Research Scenarios (15)
+
+| Phase | Scenarios |
+|-------|-----------|
+| Idea Discovery | `idea_generation`, `novelty_check`, `idea_refinement` |
+| Experiment | `experiment_design`, `result_analysis`, `claim_validation`, `ablation_review` |
+| Paper Writing | `paper_outline`, `section_draft`, `figure_table`, `full_paper` |
+| Review | `rebuttal`, `revision` |
+| General | `code_review`, `literature_review` |
+
+### Researcher Roles (12)
+
+| Role | Focus | Buddy Species |
+|------|-------|---------------|
+| Senior Reviewer | Overall quality | Owl |
+| Novelty Critic | Originality | Ghost |
+| Methods Expert | Methodology | Robot |
+| Statistics Expert | Statistical rigor | Robot |
+| Writing Expert | Clarity | Cat |
+| Domain Expert | Technical correctness | Dragon |
+| Literature Expert | Related work | Octopus |
+| Code Expert | Implementation | Robot |
+| Reproducibility Advocate | Reproducibility | Cat |
+| Skeptic | Finding flaws | Ghost |
+| Area Chair | Meta-review | Dragon |
+| Visualization Expert | Figures/tables | Octopus |
+
+### Judge Skills (5)
+
+| Skill | Source | Best For |
+|-------|--------|----------|
+| G-Eval | DeepEval | Multi-dimensional CoT scoring |
+| Prometheus | prometheus-eval | Custom rubric evaluation |
+| Pairwise | AlpacaEval | Head-to-head comparison |
+| PandaLM | PandaLM | Reproducible eval with reference |
+| JudgeLM | JudgeLM (ICLR 2025) | Bias-mitigated scalable judging |
+
+### Usage
+
+```python
+from markscientist.agents import ReviewerAgent
+from markscientist.buddy import ResearchScenario, ResearcherRole, JudgeSkill
+
+reviewer = ReviewerAgent(config=config)
+
+# Single review with specific configuration
+review = reviewer.review_with_buddy(
+    artifact=code,
+    scenario=ResearchScenario.CODE_REVIEW,
+    role=ResearcherRole.CODE_EXPERT,
+    skill=JudgeSkill.GEVAL,
+)
+
+# Panel review with multiple judges
+panel_result = reviewer.review_with_panel(
+    artifact=paper_draft,
+    scenario=ResearchScenario.FULL_PAPER,
+    num_judges=3,
+)
+
+# Pairwise comparison
+comparison = reviewer.compare_artifacts(
+    artifact_a=version1,
+    artifact_b=version2,
+    scenario=ResearchScenario.SECTION_DRAFT,
+)
+
+# Claim validation
+validation = reviewer.validate_claims(
+    claims=["Method X improves accuracy by 10%", "Approach is O(n)"],
+    evidence=experiment_results,
+)
+```
+
+## Commands
 
 ```
-/help       Show commands        /workflow   Full pipeline
-/solver     Solver mode          /review     Toggle auto-review
-/judge      Judge mode           /model      Switch model
-/evaluator  Evaluator mode       /config     Show config
-/clear      New session
+/help        Show commands        /workflow    Full pipeline
+/solver      Solver mode          /review      Toggle auto-review
+/model       Switch model         /config      Show config
+/clear       New session          /exit        Exit REPL
+
+JudgeBuddy commands:
+/judge       Review with JudgeBuddy (scenario:role:skill -- content)
+/panel       Multi-judge panel review
+/compare     Pairwise comparison (scenario -- A ||| B)
+/scenarios   List all research scenarios
+/roles       List all researcher roles
+/skills      List all judge skills
 ```
 
-## 🎯 Task Types
+## Task Types
 
 | Type | Scoring Dimensions |
 |------|-------------------|
@@ -323,7 +393,7 @@ print(f"System Insights: {meta.system_insights}")
 | `data_analysis` | accuracy, interpretation, visualization |
 | `problem_solving` | correctness, efficiency, explanation |
 
-## ⚙️ Config
+## Config
 
 ```bash
 # .env
@@ -335,13 +405,15 @@ RESEARCHHARNESS_PATH=./vendor/ResearchHarness
 
 If you need a non-default `ResearchHarness` checkout programmatically, call `set_config(config)` before importing `markscientist.agents`.
 
-## 🗺️ Roadmap
+## Roadmap
 
-- [x] v0.1 — Three agents, multi-type Judge, Buddies
-- [ ] v0.2 — Enhanced data collection
-- [ ] v0.3 — Workflow optimization
+- [x] v0.1 — Three agents (Proposer, Solver, Reviewer), multi-type review, Buddies
+- [x] v0.2 — JudgeBuddy system (scenarios, roles, skills), panel review, claim validation
+- [x] v0.2 — Arrow-key CLI interaction, pairwise comparison
+- [ ] v0.3 — Taste learning from user feedback
+- [ ] v0.3 — Workflow optimization with adaptive scoring
 - [ ] v1.0 — Stronger workflow policies, richer evaluation, better high-level testing
 
-## 🪪 License
+## License
 
 This project is released under the [MIT License](LICENSE).
