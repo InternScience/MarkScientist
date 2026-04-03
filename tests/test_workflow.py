@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from markscientist.agents.base import AgentResult
-from markscientist.agents.judge import ReviewResult
+from markscientist.agents.judge import ReviewResult, _build_review_prompt
 from markscientist.config import Config, TrajectoryConfig
 from markscientist.workflow.basic import ResearchWorkflow
 
@@ -90,6 +90,53 @@ class FakeJudge:
             termination_reason="result",
             trace_path=str(self.trace_path),
         )
+
+    def review_project_report(
+        self,
+        *,
+        original_prompt: str,
+        instructions_text: str,
+        challenge_brief: str,
+        checklist_text: str,
+        judge_materials_text: str,
+        report_text: str,
+        report_scenario=None,
+        taste_feedback_path=None,
+        workspace_root=None,
+    ):
+        return self._next_review(
+            prompt=_build_review_prompt(
+                original_prompt=original_prompt,
+                instructions_text=instructions_text,
+                challenge_brief=challenge_brief,
+                checklist_text=checklist_text,
+                judge_materials_text=judge_materials_text,
+                report_text=report_text,
+            ),
+            workspace_root=workspace_root,
+        )
+
+    def _next_review(self, *, prompt: str, workspace_root=None):
+        result = self.run(prompt, workspace_root=workspace_root)
+        payload = json.loads(result.output)
+        review = ReviewResult(
+            overall_score=payload.get("overall_score", 0.0),
+            project_score=payload.get("project_score", 0.0),
+            report_score=payload.get("report_score", 0.0),
+            verdict=payload.get("verdict", ""),
+            summary=payload.get("summary", ""),
+            next_action=payload.get("next_action", "solver_revision"),
+            strengths=payload.get("strengths", []),
+            weaknesses=payload.get("weaknesses", []),
+            suggestions=payload.get("suggestions", []),
+            checklist_scores=payload.get("checklist_scores", []),
+            confidence=payload.get("confidence", 0.0),
+            raw_output=result.output,
+            termination_reason=result.termination_reason,
+            trace_path=result.trace_path,
+            metadata=payload.get("metadata", {}),
+        )
+        return review
 
 
 class DummyWorkflow(ResearchWorkflow):
@@ -401,6 +448,9 @@ def test_workflow_separates_public_workspace_from_judge_materials(tmp_path: Path
     assert workflow.judge.workspace_roots == [tmp_path]
     assert "Hidden note: do not leak exact target conclusions." in workflow.judge.prompts[0]
     assert "Hidden criterion" in workflow.judge.prompts[0]
+    assert "## Project Review Policy" in workflow.judge.prompts[0]
+    assert "## Report Review Policy" in workflow.judge.prompts[0]
+    assert "scenario: project_definition" in workflow.judge.prompts[0]
 
 
 class RepairingChallenger:

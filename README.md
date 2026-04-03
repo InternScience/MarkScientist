@@ -36,6 +36,7 @@ The point is not to replace ResearchHarness. The point is to build a **scientifi
 - [⚡ Quick Start](#-quick-start)
 - [🧠 How It Works](#-how-it-works)
 - [🗂 Project Model](#-project-model)
+- [🧪 Judge Model](#-judge-model)
 - [🧭 Architecture Boundary](#-architecture-boundary)
 - [💬 Usage](#-usage)
 - [📋 Commands](#-commands)
@@ -61,6 +62,8 @@ The point is not to replace ResearchHarness. The point is to build a **scientifi
   MarkScientist preserves per-agent ResearchHarness traces and adds a higher-level workflow summary.
 - **Checklist-based judging**
   Judge scores the project and report against an explicit challenge brief and checklist rather than vague style preferences.
+- **Scenario-aware Judge policies**
+  Judge uses explicit review policies that combine scenario, reviewer perspective, and scoring skill instead of one generic review prompt.
 
 ### At a Glance
 
@@ -70,6 +73,7 @@ The point is not to replace ResearchHarness. The point is to build a **scientifi
 | Roles | Challenger, Solver, Judge |
 | Core artifact | A prepared research project workspace |
 | Review model | Score, critique, and improve the report |
+| Judge policy model | scenario × perspective × skill |
 | Trace model | Workflow summary plus per-agent traces |
 | UX | Interactive multi-agent CLI |
 | Scope | Scientific workflow layer, not execution harness |
@@ -93,6 +97,7 @@ flowchart TD
     U[User Prompt] --> WF[Workflow Scheduler]
     WF --> C[Challenger]
     C --> P[Prepared Project Workspace]
+    P --> JP[Project Review Contract]
     P --> S[Solver]
     S --> R[report/report.md]
     R --> J[Judge]
@@ -100,6 +105,7 @@ flowchart TD
     F -->|solver_revision| S
     F -->|rechallenge| C
     F -->|accept| DONE[Workflow Complete]
+    S -. revised report .-> J
     WF --> T[Workflow Trace Summary]
 ```
 
@@ -159,6 +165,51 @@ Role responsibilities:
 - `Judge` evaluates the public deliverables and may additionally read `judge/` as hidden evaluation material.
 
 This separation is intentional: hidden scoring criteria or target answers should never be exposed through the public project files that the Solver can read.
+
+## 🧪 Judge Model
+
+The current Judge keeps the simple `Challenger / Solver / Judge` architecture, but its review logic is no longer one flat prompt. It now uses a lightweight policy model:
+
+- **Scenario**: what kind of thing is being judged
+- **Perspective**: which specialized reviewer viewpoint to emulate
+- **Skill**: which scoring style to emulate
+
+Built-in Judge scenarios:
+
+| Scenario | What it emphasizes |
+| --- | --- |
+| `project_definition` | grounding, scope, executability, scientific value, non-toy quality |
+| `research_report` | methodology, evidence, results, limitations, reproducibility |
+| `claim_validation` | evidence support, claim scope, overclaim risk |
+| `revision_comparison` | improvement, regression risk, evidence gain, checklist progress |
+
+Current reviewer perspectives:
+
+| Perspective | Focus |
+| --- | --- |
+| `senior_reviewer` | overall decision quality |
+| `methods_expert` | design rigor and scope control |
+| `literature_expert` | prior work coverage and positioning |
+| `reproducibility_advocate` | artifact completeness |
+| `skeptic` | unsupported claims and overclaim detection |
+| `area_chair` | balanced final judgment |
+
+Current scoring skills:
+
+| Skill | Style |
+| --- | --- |
+| `geval` | multi-dimensional rubric scoring |
+| `prometheus` | strict criterion-by-criterion grading |
+| `pairwise` | before-after comparison |
+| `judgelm` | evidence-heavy judgment and claim scrutiny |
+
+The public workflow currently uses these policies internally:
+
+- project definition review defaults to `project_definition × methods_expert × prometheus`
+- report review defaults to `research_report × area_chair × judgelm`
+- claim validation remains available as an explicit report-review scenario when a caller chooses it programmatically
+
+Taste calibration is disabled by default. If a caller explicitly provides a feedback-history file path, Judge can apply small score offsets derived from repeated user feedback.
 
 ## 🧭 Architecture Boundary
 
@@ -240,6 +291,7 @@ markscientist "Review the current report" --agent judge --json
 from pathlib import Path
 
 from markscientist.config import Config, set_config
+from markscientist.judging import JudgeScenario
 from markscientist.project import ensure_project_layout
 
 config = Config.from_env()
@@ -258,7 +310,16 @@ solver = SolverAgent(config=config, workspace_root=paths.public_root)
 solver_result = solver.run("Execute the prepared project.", workspace_root=paths.public_root)
 
 judge = JudgeAgent(config=config, workspace_root=paths.project_root)
-judge_result = judge.run("Review the current report strictly.", workspace_root=paths.project_root)
+judge_result = judge.review_project_report(
+    original_prompt="Review the current report strictly.",
+    instructions_text=paths.instructions_path.read_text(encoding="utf-8"),
+    challenge_brief=paths.challenge_brief_path.read_text(encoding="utf-8"),
+    checklist_text=paths.checklist_path.read_text(encoding="utf-8"),
+    judge_materials_text="",
+    report_text=paths.report_path.read_text(encoding="utf-8"),
+    report_scenario=JudgeScenario.RESEARCH_REPORT,
+    workspace_root=paths.project_root,
+)
 
 workflow = ResearchWorkflow(config=config)
 workflow_result = workflow.run("Write a research report", workspace_root=config.workspace_root)
@@ -298,7 +359,7 @@ If you need a non-default workspace root, set `config.workspace_root` before cre
 ## 🧪 Testing
 
 ```bash
-PYTHONDONTWRITEBYTECODE=1 pytest -q -p no:cacheprovider tests/test_agents.py tests/test_workflow.py tests/test_cli.py
+PYTHONDONTWRITEBYTECODE=1 pytest -q -p no:cacheprovider tests
 ```
 
 The test suite checks:

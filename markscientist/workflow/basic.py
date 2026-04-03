@@ -5,7 +5,8 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 from markscientist.agents.challenger import ChallengerAgent
-from markscientist.agents.judge import JudgeAgent, ReviewResult, _build_review_prompt, _parse_review_output
+from markscientist.agents.judge import JudgeAgent, ReviewResult
+from markscientist.judging import JudgeScenario
 from markscientist.agents.solver import SolverAgent
 from markscientist.config import Config, get_config
 from markscientist.project import (
@@ -104,20 +105,16 @@ class ResearchWorkflow:
         on_event=None,
     ) -> ReviewResult:
         judge = self._new_judge(project_root, recorder.trace_dir_for("judge"), on_event=on_event)
-        judge_result = judge.run(
-            _build_review_prompt(
-                original_prompt=prompt,
-                instructions_text=instructions_text,
-                challenge_brief=challenge_brief,
-                checklist_text=checklist_text,
-                judge_materials_text=judge_materials_text,
-                report_text=report_text,
-            ),
+        review = judge.review_project_report(
+            original_prompt=prompt,
+            instructions_text=instructions_text,
+            challenge_brief=challenge_brief,
+            checklist_text=checklist_text,
+            judge_materials_text=judge_materials_text,
+            report_text=report_text,
+            report_scenario=JudgeScenario.RESEARCH_REPORT,
             workspace_root=project_root,
         )
-        review = _parse_review_output(judge_result.output)
-        review.termination_reason = judge_result.termination_reason
-        review.trace_path = judge_result.trace_path
         recorder.capture_agent_result("judge", review)
         return review
 

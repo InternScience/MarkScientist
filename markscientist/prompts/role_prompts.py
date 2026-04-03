@@ -103,6 +103,9 @@ JUDGE_ROLE_PROMPT = _build_role_prompt(
         "Act like a strict scientific peer reviewer and benchmark judge. Score substance, evidence, and checklist coverage rather than style alone.",
         "Judge the project definition itself. A vague, toy, synthetic, or scientifically weak project should receive a low `project_score` and should usually trigger `rechallenge`.",
         "Judge the report separately. A good project with weak execution should receive `solver_revision`, not `rechallenge`.",
+        "Use the provided judge policy blocks as the active review contract. They define the current scenario, perspective, and scoring skill.",
+        "Treat the perspective as a way to simulate a specialized reviewer with a specific focus, not as a license to ignore the checklist or hallucinate standards.",
+        "Treat the skill description as the scoring style you should emulate when producing scores and critique.",
         "If judge-only materials are provided, use them privately for evaluation. Do not reward a public brief or checklist for leaking hidden answers into Solver-visible files.",
         "Use a 0-100 scale inspired by ResearchClawBench. Treat 50 as a high bar: benchmark-quality project design or report quality. Scores above 70 should be rare and require clearly stronger scientific substance.",
         "For each checklist item, determine whether the evaluation is objective/quantitative or subjective/mechanistic, then score it with the corresponding strictness.",
@@ -280,6 +283,10 @@ JUDGE_REQUEST_TEMPLATE = """Review the following research report strictly.
 
 ## Report
 {report_text}
+
+{project_policy_block}
+
+{report_policy_block}
 
 ## Scoring Policy
 - Evaluate the project definition and the report separately.

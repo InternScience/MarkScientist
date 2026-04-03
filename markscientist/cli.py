@@ -18,6 +18,7 @@ from rich.spinner import Spinner
 from rich.table import Table
 
 from markscientist.config import Config, get_config, set_config
+from markscientist.judging import JudgeScenario
 from markscientist.project import (
     describe_workspace_inputs,
     ensure_project_layout,
@@ -183,8 +184,6 @@ class MarkScientistCLI:
                 self._spinner.stop()
 
     def run_judge(self, prompt: str, show_spinner: bool = True):
-        from markscientist.agents.judge import _build_review_prompt, _parse_review_output
-
         project_root = self._workspace_root()
         paths = ensure_project_layout(project_root)
         instructions_text = read_text_if_exists(paths.instructions_path, default="INSTRUCTIONS.md is missing.")
@@ -195,20 +194,17 @@ class MarkScientistCLI:
         if show_spinner:
             self._spinner.start("Judge reviewing report...")
         try:
-            result = self._get_agent("judge").run(
-                _build_review_prompt(
-                    original_prompt=prompt,
-                    instructions_text=instructions_text,
-                    challenge_brief=challenge_brief,
-                    checklist_text=checklist_text,
-                    judge_materials_text=judge_materials_text,
-                    report_text=report_text,
-                ),
+            judge = self._get_agent("judge")
+            review = judge.review_project_report(
+                original_prompt=prompt,
+                instructions_text=instructions_text,
+                challenge_brief=challenge_brief,
+                checklist_text=checklist_text,
+                judge_materials_text=judge_materials_text,
+                report_text=report_text,
+                report_scenario=JudgeScenario.RESEARCH_REPORT,
                 workspace_root=project_root,
             )
-            review = _parse_review_output(result.output)
-            review.termination_reason = result.termination_reason
-            review.trace_path = result.trace_path
             return review
         finally:
             if show_spinner:
