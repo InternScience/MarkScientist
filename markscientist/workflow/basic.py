@@ -11,6 +11,7 @@ from markscientist.config import Config, get_config
 from markscientist.project import ensure_project_layout, load_checklist_text, read_text_if_exists
 from markscientist.prompts import (
     CHALLENGE_REQUEST_TEMPLATE,
+    CHALLENGER_IMPROVEMENT_GUIDANCE_TEMPLATE,
     SOLVER_IMPROVEMENT_GUIDANCE_TEMPLATE,
     SOLVER_REQUEST_TEMPLATE,
 )
@@ -127,7 +128,10 @@ class ResearchWorkflow:
 
         challenger = self._new_challenger(paths.workspace_root, recorder.trace_dir_for("challenger"), on_event=on_event)
         challenge_result = challenger.run(
-            CHALLENGE_REQUEST_TEMPLATE.format(original_prompt=prompt),
+            CHALLENGE_REQUEST_TEMPLATE.format(
+                original_prompt=prompt,
+                additional_guidance="Prepare the initial research project definition for the Solver.",
+            ),
             workspace_root=paths.workspace_root,
         )
         recorder.capture_agent_result("challenger", challenge_result)
@@ -143,6 +147,7 @@ class ResearchWorkflow:
         recorder.capture_agent_result("solver", solver_result)
 
         iterations = 1
+        challenge_output = challenge_result.output
         challenge_brief = read_text_if_exists(paths.challenge_brief_path, default="challenge/brief.md is missing.")
         checklist_text = load_checklist_text(paths.checklist_path)
         report_text = read_text_if_exists(paths.report_path, default=solver_result.output)
@@ -158,13 +163,35 @@ class ResearchWorkflow:
 
         while judge_review.overall_score < self.improvement_threshold and iterations < self.max_iterations:
             iterations += 1
+            if judge_review.next_action == "rechallenge":
+                challenger = self._new_challenger(paths.workspace_root, recorder.trace_dir_for("challenger"), on_event=on_event)
+                challenge_result = challenger.run(
+                    CHALLENGE_REQUEST_TEMPLATE.format(
+                        original_prompt=prompt,
+                        additional_guidance=CHALLENGER_IMPROVEMENT_GUIDANCE_TEMPLATE.format(
+                            judge_feedback=judge_review.raw_output,
+                        ),
+                    ),
+                    workspace_root=paths.workspace_root,
+                )
+                recorder.capture_agent_result("challenger", challenge_result)
+                challenge_output = challenge_result.output
+                challenge_brief = read_text_if_exists(paths.challenge_brief_path, default="challenge/brief.md is missing.")
+                checklist_text = load_checklist_text(paths.checklist_path)
+                solver_guidance = (
+                    "The Challenger revised the project definition. "
+                    "Read the updated challenge files from scratch and regenerate the deliverables to match them."
+                )
+            else:
+                solver_guidance = SOLVER_IMPROVEMENT_GUIDANCE_TEMPLATE.format(
+                    judge_feedback=judge_review.raw_output,
+                )
+
             solver = self._new_solver(paths.workspace_root, recorder.trace_dir_for("solver"), on_event=on_event)
             solver_result = solver.run(
                 SOLVER_REQUEST_TEMPLATE.format(
                     original_prompt=prompt,
-                    additional_guidance=SOLVER_IMPROVEMENT_GUIDANCE_TEMPLATE.format(
-                        judge_feedback=judge_review.raw_output,
-                    ),
+                    additional_guidance=solver_guidance,
                 ),
                 workspace_root=paths.workspace_root,
             )
@@ -197,7 +224,7 @@ class ResearchWorkflow:
         return WorkflowResult(
             prompt=prompt,
             workspace_root=str(paths.workspace_root),
-            challenge_output=challenge_result.output,
+            challenge_output=challenge_output,
             solver_output=final_output,
             judge_review=judge_review,
             final_score=judge_review.overall_score,

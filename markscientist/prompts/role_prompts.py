@@ -95,7 +95,9 @@ JUDGE_ROLE_PROMPT = _build_role_prompt(
     ],
     output_contract=[
         "Return JSON only.",
-        "Include `overall_score`, `verdict`, `summary`, `checklist_scores`, `strengths`, `weaknesses`, `suggestions`, and `confidence`.",
+        "Include `overall_score`, `verdict`, `summary`, `next_action`, `checklist_scores`, `strengths`, `weaknesses`, `suggestions`, and `confidence`.",
+        "Set `next_action` to `solver_revision` when the project definition is still valid and the Solver should improve the deliverables.",
+        "Set `next_action` to `rechallenge` only when the project definition, checklist, or task framing itself needs to be rewritten before the Solver continues.",
         "Each checklist score item should include at least `title`, `score`, and `reasoning`.",
     ],
 )
@@ -105,6 +107,9 @@ CHALLENGE_REQUEST_TEMPLATE = """Prepare a self-contained research project in the
 
 ## User Prompt
 {original_prompt}
+
+## Additional Guidance
+{additional_guidance}
 
 ## Required Workspace Layout
 - `challenge/brief.md`
@@ -171,6 +176,19 @@ JUDGE_REQUEST_TEMPLATE = """Review the following research report strictly.
 {report_text}
 
 Score the report against the checklist. Reward only concrete evidence and completed deliverables. Return JSON only.
+Choose `next_action` carefully:
+- use `solver_revision` when the Solver should improve the current project deliverables
+- use `rechallenge` only when the project definition itself is flawed and needs to be rewritten before more solving
+"""
+
+
+CHALLENGER_IMPROVEMENT_GUIDANCE_TEMPLATE = """Revise the project definition using the Judge feedback below.
+
+## Current Judge Feedback
+{judge_feedback}
+
+## Revision Goal
+Rewrite the project brief, checklist, and instructions only if the current project definition is too weak, too vague, misaligned with the user request, or otherwise not executable enough for the Solver.
 """
 
 

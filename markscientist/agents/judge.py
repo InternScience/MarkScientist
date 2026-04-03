@@ -16,6 +16,7 @@ class ReviewResult:
     overall_score: float = 0.0
     verdict: str = ""
     summary: str = ""
+    next_action: str = "solver_revision"
     strengths: List[str] = field(default_factory=list)
     weaknesses: List[str] = field(default_factory=list)
     suggestions: List[str] = field(default_factory=list)
@@ -30,6 +31,7 @@ class ReviewResult:
             "overall_score": self.overall_score,
             "verdict": self.verdict,
             "summary": self.summary,
+            "next_action": self.next_action,
             "strengths": self.strengths,
             "weaknesses": self.weaknesses,
             "suggestions": self.suggestions,
@@ -73,6 +75,8 @@ def _parse_review_output(raw_output: str) -> ReviewResult:
     review.overall_score = float(data.get("overall_score", 0))
     review.verdict = data.get("verdict", "")
     review.summary = data.get("summary", "")
+    next_action = str(data.get("next_action", "solver_revision")).strip().lower()
+    review.next_action = "rechallenge" if next_action == "rechallenge" else "solver_revision"
     review.strengths = data.get("strengths", [])
     review.weaknesses = data.get("weaknesses", [])
     review.suggestions = data.get("suggestions", [])

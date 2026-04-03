@@ -55,6 +55,8 @@ The point is not to replace ResearchHarness. The point is to build a **scientifi
   The workflow is built around a concrete workspace with instructions, checklist, code, outputs, and `report/report.md`.
 - **Review-driven improvement**
   The workflow can iteratively improve outputs based on Judge feedback instead of stopping at one draft.
+- **Conditional re-challenge**
+  Judge can send the workflow back to Challenger when the project definition itself is too weak, not just the report.
 - **Workflow-level traces**
   MarkScientist preserves per-agent ResearchHarness traces and adds a higher-level workflow summary.
 - **Checklist-based judging**
@@ -94,9 +96,10 @@ flowchart TD
     P --> S[Solver]
     S --> R[report/report.md]
     R --> J[Judge]
-    J --> F[Scored Feedback]
-    F -->|below threshold| S
-    F -->|acceptable| DONE[Workflow Complete]
+    J --> F{Next Action}
+    F -->|solver_revision| S
+    F -->|rechallenge| C
+    F -->|accept| DONE[Workflow Complete]
     WF --> T[Workflow Trace Summary]
 ```
 
@@ -149,7 +152,7 @@ Role responsibilities:
 
 - `Challenger` prepares `INSTRUCTIONS.md`, `challenge/brief.md`, and `challenge/checklist.json`.
 - `Solver` reads the prepared project, performs the research, and must finish with `report/report.md`.
-- `Judge` reads the brief, checklist, and report, then returns strict JSON scoring feedback.
+- `Judge` reads the brief, checklist, and report, then returns strict JSON scoring feedback plus the next workflow action.
 
 ## 🧭 Architecture Boundary
 

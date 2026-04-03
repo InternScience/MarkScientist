@@ -106,6 +106,7 @@ class MarkScientistCLI:
         score_color = "green" if review.overall_score >= 7 else "yellow" if review.overall_score >= 5 else "red"
         table.add_row("Score", f"[{score_color} bold]{review.overall_score:.1f}/10[/{score_color} bold]")
         table.add_row("Verdict", review.verdict or "Unspecified")
+        table.add_row("Next", review.next_action)
         if review.summary:
             table.add_row("Summary", review.summary[:160])
         if review.suggestions:
@@ -132,7 +133,10 @@ class MarkScientistCLI:
             self._spinner.start("Challenger preparing project...")
         try:
             result = self._get_agent("challenger").run(
-                CHALLENGE_REQUEST_TEMPLATE.format(original_prompt=prompt),
+                CHALLENGE_REQUEST_TEMPLATE.format(
+                    original_prompt=prompt,
+                    additional_guidance="Prepare the initial research project definition for the Solver.",
+                ),
                 workspace_root=workspace_root,
             )
             return result
