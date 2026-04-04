@@ -108,7 +108,7 @@ flowchart TD
     subgraph JPS[Judge Panel System]
         META[15 Scenarios · 12 Perspectives · 5 Skills]
         SK[Skill Library<br/>markscientist/skills/*/SKILL.md]
-        TL[Taste Learning]
+        TL[Taste Learning / Score Calibration]
         META --> SK
         TL --> META
     end
@@ -126,7 +126,8 @@ flowchart TD
     F -->|accept| DONE[Workflow Complete]
     S -. revised report .-> J
     J -. uses .-> META
-    FB[task/target_study/feedback_history.jsonl] -. calibrates .-> TL
+    FB[task/target_study/feedback_history.jsonl] -. feeds .-> TL
+    TL -. calibrates .-> J
     WF --> T[Workflow Trace Summary]
 ```
 
