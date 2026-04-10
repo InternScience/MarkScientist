@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -8,7 +9,7 @@ from markscientist.agents.challenger import ChallengerAgent, ChallengerPackaging
 from markscientist.agents.judge import JudgeAgent, ReviewResult
 from markscientist.judging import JudgeScenario
 from markscientist.agents.solver import SolverAgent
-from markscientist.config import Config, get_config
+from markscientist.config import Config, default_workspace_root, get_config
 from markscientist.project import (
     detect_solver_owned_file_changes,
     describe_challenger_inputs,
@@ -369,7 +370,12 @@ class ResearchWorkflow:
         workspace_root: Optional[Path] = None,
         on_event=None,
     ) -> WorkflowResult:
-        project_root = (workspace_root or self.config.workspace_root or Path.cwd()).expanduser().resolve()
+        if workspace_root is not None:
+            project_root = Path(workspace_root).expanduser().resolve()
+        elif self.config.workspace_root is not None:
+            project_root = self.config.workspace_root.expanduser().resolve()
+        else:
+            project_root = default_workspace_root(datetime.now().strftime("%Y%m%d-%H%M%S"))
         paths = ensure_project_layout(project_root)
         input_inventory = describe_workspace_inputs(paths.public_root)
         recorder = WorkflowTrajectoryRecorder(

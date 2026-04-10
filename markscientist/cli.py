@@ -17,7 +17,7 @@ from rich.panel import Panel
 from rich.spinner import Spinner
 from rich.table import Table
 
-from markscientist.config import Config, get_config, set_config
+from markscientist.config import Config, default_workspace_root, get_config, set_config
 from markscientist.judging import JudgeScenario
 from markscientist.project import (
     describe_challenger_inputs,
@@ -85,11 +85,21 @@ class MarkScientistCLI:
     def __init__(self, config: Optional[Config] = None):
         self.config = config or get_config()
         self._mode = "workflow"
-        self._session_id = datetime.now().strftime("%Y%m%d-%H%M%S")
+        self._session_id = ""
+        self._resolved_workspace_root: Optional[Path] = None
+        self._reset_session_workspace()
         self._spinner = SpinnerManager(console)
 
     def _workspace_root(self) -> Path:
-        return (self.config.workspace_root or Path.cwd()).expanduser().resolve()
+        assert self._resolved_workspace_root is not None
+        return self._resolved_workspace_root
+
+    def _reset_session_workspace(self) -> None:
+        self._session_id = datetime.now().strftime("%Y%m%d-%H%M%S")
+        if self.config.workspace_root is not None:
+            self._resolved_workspace_root = self.config.workspace_root.expanduser().resolve()
+        else:
+            self._resolved_workspace_root = default_workspace_root(self._session_id)
 
     def _public_workspace_root(self) -> Path:
         return resolve_project_paths(self._workspace_root()).public_root
@@ -271,7 +281,7 @@ class MarkScientistCLI:
         if command == "config":
             return self._show_config()
         if command == "clear":
-            self._session_id = datetime.now().strftime("%Y%m%d-%H%M%S")
+            self._reset_session_workspace()
             return "[green]Session cleared.[/green]"
         if command in {"exit", "quit"}:
             return None

@@ -117,3 +117,18 @@ def test_run_once_single_agent_json_output(monkeypatch, capsys, tmp_path: Path):
     assert judge_payload["overall_score"] == 75.0
     assert judge_payload["project_score"] == 72.0
     assert judge_payload["verdict"] == "Acceptable"
+
+
+def test_cli_defaults_workspace_under_markscientist_data(monkeypatch, tmp_path: Path):
+    config = Config(
+        trajectory=TrajectoryConfig(auto_save=False, save_dir=tmp_path / "traces"),
+    )
+    workspaces_root = (tmp_path / "data" / "workspaces").resolve()
+    monkeypatch.setattr(
+        "markscientist.cli.default_workspace_root",
+        lambda session_id: workspaces_root / session_id,
+    )
+
+    cli = MarkScientistCLI(config)
+
+    assert cli._workspace_root().is_relative_to(workspaces_root)

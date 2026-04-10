@@ -12,6 +12,16 @@ ensure_harness_on_path()
 from agent_base.utils import load_dotenv
 
 
+PACKAGE_ROOT = Path(__file__).resolve().parent.parent
+DATA_ROOT = PACKAGE_ROOT / "data"
+TRAJECTORY_ROOT = DATA_ROOT / "trajectories"
+WORKSPACE_ROOT = DATA_ROOT / "workspaces"
+
+
+def default_workspace_root(session_id: str) -> Path:
+    return (WORKSPACE_ROOT / session_id).expanduser().resolve()
+
+
 @dataclass
 class ModelConfig:
     model_name: str = "gpt-5.4"
@@ -34,7 +44,7 @@ class AgentConfig:
 @dataclass
 class TrajectoryConfig:
     auto_save: bool = True
-    save_dir: Path = field(default_factory=lambda: Path("./data/trajectories"))
+    save_dir: Path = field(default_factory=lambda: TRAJECTORY_ROOT)
 
     def __post_init__(self) -> None:
         if isinstance(self.save_dir, str):

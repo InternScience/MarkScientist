@@ -53,6 +53,8 @@ htmlcov/
 # Trajectory data (keep structure, ignore content)
 data/trajectories/*
 !data/trajectories/.gitkeep
+data/workspaces/*
+!data/workspaces/.gitkeep
 
 # Temporary files
 *.log

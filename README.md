@@ -346,7 +346,9 @@ from markscientist.judging import JudgeScenario
 from markscientist.project import ensure_project_layout
 
 config = Config.from_env()
-config.workspace_root = Path("./workspace")
+# If omitted, MarkScientist will create a project under data/workspaces/<session-id>.
+# Set an explicit repo-local workspace root only when you want a stable named project path.
+config.workspace_root = Path("./data/workspaces/demo-project")
 set_config(config)
 
 from markscientist.agents import ChallengerAgent, JudgeAgent, SolverAgent

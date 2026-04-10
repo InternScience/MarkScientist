@@ -269,6 +269,24 @@ def test_workflow_runs_challenger_solver_judge_cycle(tmp_path: Path):
     assert '"checklist_path": "' + str(tmp_path / "task" / "target_study" / "checklist.json") + '"' in payload
 
 
+def test_workflow_defaults_workspace_under_markscientist_data(monkeypatch, tmp_path: Path):
+    workspaces_root = (tmp_path / "data" / "workspaces").resolve()
+    monkeypatch.setattr(
+        "markscientist.workflow.basic.default_workspace_root",
+        lambda session_id: workspaces_root / session_id,
+    )
+    config = Config(
+        trajectory=TrajectoryConfig(auto_save=True, save_dir=tmp_path / "traces"),
+    )
+    workflow = DummyWorkflow(config=config, save_dir=config.trajectory.save_dir)
+
+    result = workflow.run("Create a research project.")
+
+    assert Path(result.workspace_root).is_relative_to(workspaces_root)
+    assert Path(result.metadata["public_workspace_root"]).is_relative_to(workspaces_root)
+    assert Path(result.metadata["report_path"]).exists()
+
+
 class RejectedImprovementWorkflow(DummyWorkflow):
     def _new_judge(self, workspace_root, trace_dir, on_event=None):
         if self.fake_judge is None:
