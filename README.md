@@ -8,7 +8,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
-[![Built On](https://img.shields.io/badge/Built%20On-ResearchHarness-2563eb.svg)](https://github.com/black-yt/ResearchHarness)
+[![Built On](https://img.shields.io/badge/Built%20On-ResearchHarness-2563eb.svg)](https://github.com/InternScience/ResearchHarness)
 [![Workflow](https://img.shields.io/badge/Workflow-Challenger%20Solver%20Judge-4f46e5.svg)](#-how-it-works)
 [![Taste Learning](https://img.shields.io/badge/Taste%20Learning-Visible%20Calibration-f59e0b.svg)](#-how-it-works)
 [![Trace](https://img.shields.io/badge/Trace-Workflow%20Summary-0f766e.svg)](#-how-it-works)
